@@ -1,7 +1,7 @@
 use avian2d::prelude as p;
 use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
-use bevy::math::{Vec3, ivec2, vec3};
+use bevy::math::{ivec2, vec2};
 use bevy::prelude as b;
 use bevy::utils::default;
 use bevy_enhanced_input::prelude as bei;
@@ -14,8 +14,8 @@ fn main() {
         .add_plugins(b::DefaultPlugins)
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
         .add_input_context::<Player>()
-        // .add_plugins(avian2d::PhysicsPlugins::default())
-        //.add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
+        .add_plugins(avian2d::PhysicsPlugins::default())
+        .add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
         //.add_plugins(player::player_plugin)
         .add_systems(b::Startup, setup)
         .add_systems(b::FixedUpdate, apply_movement)
@@ -112,8 +112,13 @@ fn shoot(
     commands.spawn((
         PlayerBullet,
         b::Sprite::from_image(asset_server.load("player-bullet.png")),
+        p::RigidBody::Kinematic,
+        p::LinearVelocity(vec2(0.0, 800.0)),
+        p::Collider::rectangle(4., 8.),
         player_transform,
     ));
 
     Ok(())
 }
+
+// -------------------------------------------------------------------------------------------------
