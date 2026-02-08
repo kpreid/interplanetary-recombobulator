@@ -2,10 +2,9 @@ use std::f32::consts::PI;
 
 use avian2d::prelude as p;
 use bevy::app::PluginGroup as _;
-use bevy::audio::PlaybackSettings;
 use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
-use bevy::math::{ivec2, vec2};
+use bevy::math::{Vec2, ivec2, vec2};
 use bevy::prelude as b;
 use bevy::utils::default;
 use bevy_enhanced_input::prelude as bei;
@@ -115,7 +114,7 @@ fn apply_movement(
     player_query: b::Query<&mut b::Transform, b::With<Player>>,
 ) -> b::Result {
     let movement: b::Vec2 = ***action;
-    let movement = movement * 10.0;
+    let movement = movement * 5.0;
     for mut transform in player_query {
         transform.translation.x += movement.x;
         transform.translation.y += movement.y;
@@ -136,15 +135,21 @@ fn shoot(
         return Ok(());
     }
 
-    commands.spawn((
-        PlayerBullet,
-        Lifetime(0.2),
-        b::Sprite::from_image(asset_server.load("player-bullet.png")),
-        p::RigidBody::Kinematic,
-        p::LinearVelocity(vec2(0.0, 800.0)),
-        p::Collider::rectangle(4., 8.),
-        player_transform,
-    ));
+    for bullet_angle_deg in (-15..=15).step_by(5) {
+        let bullet_angle_rad = (bullet_angle_deg as f32).to_radians();
+
+        let speed = rand::rng().random_range(500.0..=1000.0);
+        commands.spawn((
+            PlayerBullet,
+            Lifetime(0.4),
+            b::Sprite::from_image(asset_server.load("player-bullet.png")),
+            p::RigidBody::Kinematic,
+            p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
+            p::Collider::rectangle(4., 8.),
+            player_transform
+                * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad)),
+        ));
+    }
     commands.spawn((
         b::AudioPlayer::new(asset_server.load("fire.ogg")),
         b::PlaybackSettings {
