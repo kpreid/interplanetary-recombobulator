@@ -1,4 +1,8 @@
+use std::f32::consts::PI;
+
 use avian2d::prelude as p;
+use bevy::app::PluginGroup as _;
+use bevy::audio::PlaybackSettings;
 use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{ivec2, vec2};
@@ -11,7 +15,10 @@ use bevy_enhanced_input::prelude::InputContextAppExt as _;
 
 fn main() {
     b::App::new()
-        .add_plugins(b::DefaultPlugins)
+        .add_plugins(b::DefaultPlugins.set(bevy::audio::AudioPlugin {
+            default_spatial_scale: bevy::audio::SpatialScale::new_2d(0.001),
+            ..default()
+        }))
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
         .add_input_context::<Player>()
         .add_plugins(avian2d::PhysicsPlugins::default())
@@ -86,11 +93,12 @@ fn setup(
         ]),
     ));
 
-    // test second sprite
-    // commands.spawn((
-    //     b::Sprite::from_image(player_sprite_asset.clone()),
-    //     b::Transform::from_xyz(10., 0., 0.),
-    // ));
+    // Spatial audio listener (*not* attached to the player ship)
+    commands.spawn((
+        b::SpatialListener::new(2.0),
+        // for some reason it seems we need to reverse left-right
+        b::Transform::from_rotation(b::Quat::from_rotation_y(PI)),
+    ));
 }
 
 fn apply_movement(
@@ -121,6 +129,15 @@ fn shoot(
         p::RigidBody::Kinematic,
         p::LinearVelocity(vec2(0.0, 800.0)),
         p::Collider::rectangle(4., 8.),
+        player_transform,
+    ));
+    commands.spawn((
+        b::AudioPlayer::new(asset_server.load("fire.ogg")),
+        b::PlaybackSettings {
+            spatial: true,
+            volume: bevy::audio::Volume::Decibels(-10.),
+            ..b::PlaybackSettings::DESPAWN
+        },
         player_transform,
     ));
 
