@@ -44,10 +44,10 @@ fn main() {
 // -------------------------------------------------------------------------------------------------
 
 /// Size of UI enclosing playfield, for pixel rendering
-const SCREEN_SIZE: b::UVec2 = b::uvec2(640, 480);
+const SCREEN_SIZE: b::UVec2 = b::uvec2(320, 240);
 
 /// Size of the playfield
-const PLAYFIELD_SIZE: b::UVec2 = b::uvec2(320, 460);
+const PLAYFIELD_SIZE: b::UVec2 = b::uvec2(160, 200);
 
 const PIXEL_LAYERS: RenderLayers = RenderLayers::layer(0);
 const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(1);
