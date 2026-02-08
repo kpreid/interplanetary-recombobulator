@@ -19,14 +19,21 @@ fn main() {
         //.add_plugins(player::player_plugin)
         .add_systems(b::Startup, setup)
         .add_systems(b::FixedUpdate, apply_movement)
+        .add_observer(shoot)
         .run();
 }
 
 // -------------------------------------------------------------------------------------------------
 
+/// Player ship entity
 #[derive(Debug, b::Component)]
 #[require(b::Transform)]
 struct Player;
+
+#[derive(Debug, b::Component)]
+struct PlayerBullet;
+
+// -------------------------------------------------------------------------------------------------
 
 #[derive(Debug, bei::InputAction)]
 #[action_output(b::Vec2)]
@@ -94,6 +101,19 @@ fn apply_movement(
     Ok(())
 }
 
-fn shoot(_shoot: b::On<bei::Fire<Shoot>>, player_query: b::Query<&b::Transform, b::With<Player>>) {
-    todo!()
+fn shoot(
+    _shoot: b::On<bei::Fire<Shoot>>,
+    mut commands: b::Commands,
+    player_query: b::Query<&b::Transform, b::With<Player>>,
+    asset_server: b::Res<b::AssetServer>,
+) -> b::Result {
+    let player_transform: b::Transform = *player_query.single()?;
+
+    commands.spawn((
+        PlayerBullet,
+        b::Sprite::from_image(asset_server.load("player-bullet.png")),
+        player_transform,
+    ));
+
+    Ok(())
 }
