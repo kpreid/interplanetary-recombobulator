@@ -25,7 +25,28 @@ fn main() {
                     default_spatial_scale: bevy::audio::SpatialScale::new_2d(0.001),
                     ..default()
                 })
-                .set(b::ImagePlugin::default_nearest()),
+                .set(b::ImagePlugin::default_nearest())
+                .set(b::WindowPlugin {
+                    primary_window: Some(b::Window {
+                        //TODO: positioning for development, not for release
+                        position: b::WindowPosition::At(ivec2(3000, 0)),
+
+                        resolution: {
+                            let desired_scale = 2;
+                            let cautionary_fudge_pixels = 2;
+                            bevy::window::WindowResolution::new(
+                                SCREEN_SIZE.x * desired_scale
+                                    + SCALING_MARGIN
+                                    + cautionary_fudge_pixels,
+                                SCREEN_SIZE.y * desired_scale
+                                    + SCALING_MARGIN
+                                    + cautionary_fudge_pixels,
+                            )
+                        },
+                        ..default()
+                    }),
+                    ..default()
+                }),
         )
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
         .add_input_context::<Player>()
@@ -44,10 +65,12 @@ fn main() {
 // -------------------------------------------------------------------------------------------------
 
 /// Size of UI enclosing playfield, for pixel rendering
-const SCREEN_SIZE: b::UVec2 = b::uvec2(320, 240);
+const SCREEN_SIZE: b::UVec2 = b::uvec2(640, 480);
 
 /// Size of the playfield
-const PLAYFIELD_SIZE: b::UVec2 = b::uvec2(160, 200);
+const PLAYFIELD_SIZE: b::UVec2 = b::uvec2(320, 460);
+
+const SCALING_MARGIN: u32 = 10;
 
 const PIXEL_LAYERS: RenderLayers = RenderLayers::layer(0);
 const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(1);
@@ -106,9 +129,6 @@ fn setup_camera(
     mut windows: b::Query<&mut b::Window>,
     mut images: b::ResMut<b::Assets<b::Image>>,
 ) {
-    // reposition window for development
-    windows.single_mut().unwrap().position = b::WindowPosition::At(ivec2(3000, 0));
-
     // “Pixel perfect” setup per <https://github.com/bevyengine/bevy/blob/release-0.18.1/examples/2d/pixel_grid_snap.rs>
 
     let canvas_size = Extent3d {
@@ -169,9 +189,8 @@ fn fit_canvas_to_window(
         // need physical size because that's what Camera2D relates to
         let window = windows.get(window_resized.window)?;
         let size = window.physical_size();
-        let margin = 0;
-        let h_scale = (size.x - margin) / SCREEN_SIZE.x;
-        let v_scale = (size.y - margin) / SCREEN_SIZE.y;
+        let h_scale = (size.x - SCALING_MARGIN) / SCREEN_SIZE.x;
+        let v_scale = (size.y - SCALING_MARGIN) / SCREEN_SIZE.y;
         projection.scale = window.scale_factor() / (h_scale.min(v_scale).max(1) as f32);
     }
     Ok(())
