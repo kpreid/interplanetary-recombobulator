@@ -32,6 +32,10 @@ struct Player;
 #[action_output(b::Vec2)]
 struct Move;
 
+#[derive(Debug, bei::InputAction)]
+#[action_output(bool)]
+struct Shoot;
+
 // -------------------------------------------------------------------------------------------------
 
 fn setup(
@@ -63,10 +67,10 @@ fn setup(
                     bei::Axial::left_stick(),
                 )),
             ),
-            // (
-            //     bei::Action::<Fire>::new(),
-            //     bei::bindings![MouseButton::Left, GamepadButton::RightTrigger2],
-            // ),
+            (
+                bei::Action::<Shoot>::new(),
+                bei::bindings![b::KeyCode::Space, b::GamepadButton::South],
+            )
         ]),
     ));
 
@@ -88,4 +92,8 @@ fn apply_movement(
         transform.translation.y += movement.y;
     }
     Ok(())
+}
+
+fn shoot(_shoot: b::On<bei::Fire<Shoot>>, player_query: b::Query<&b::Transform, b::With<Player>>) {
+    todo!()
 }
