@@ -27,6 +27,7 @@ fn main() {
         .add_systems(b::Startup, setup)
         .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(b::FixedUpdate, expire_lifetimes)
+        .add_systems(b::FixedUpdate, gun_cooldown)
         .add_observer(shoot)
         .run();
 }
@@ -40,6 +41,12 @@ struct Player;
 
 #[derive(Debug, b::Component)]
 struct PlayerBullet;
+
+#[derive(Debug, b::Component)]
+struct Gun {
+    /// If positive, gun may not shoot.
+    cooldown: f32,
+}
 
 /// Decremented by game time and despawns the entity when it is zero
 #[derive(Debug, b::Component)]
@@ -91,6 +98,7 @@ fn setup(
                 bei::bindings![b::KeyCode::Space, b::GamepadButton::South],
             )
         ]),
+        Gun { cooldown: 0.0 },
     ));
 
     // Spatial audio listener (*not* attached to the player ship)
@@ -117,10 +125,15 @@ fn apply_movement(
 fn shoot(
     _shoot: b::On<bei::Fire<Shoot>>,
     mut commands: b::Commands,
-    player_query: b::Query<&b::Transform, b::With<Player>>,
+    gun_query: b::Query<(&b::Transform, &mut Gun)>,
     asset_server: b::Res<b::AssetServer>,
 ) -> b::Result {
-    let player_transform: b::Transform = *player_query.single()?;
+    let (player_transform, mut gun) = gun_query.single_inner()?;
+    let player_transform: b::Transform = *player_transform;
+
+    if gun.cooldown != 0.0 {
+        return Ok(());
+    }
 
     commands.spawn((
         PlayerBullet,
@@ -141,6 +154,8 @@ fn shoot(
         player_transform,
     ));
 
+    gun.cooldown = 0.25;
+
     Ok(())
 }
 
@@ -158,6 +173,18 @@ fn expire_lifetimes(
             lifetime.0 = new_lifetime;
         } else {
             commands.entity(entity).despawn();
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
+    let delta = time.delta_secs();
+    for mut gun in query {
+        let new_cooldown = (gun.cooldown - delta).max(0.0);
+        if new_cooldown != gun.cooldown {
+            gun.cooldown = new_cooldown;
         }
     }
 }
