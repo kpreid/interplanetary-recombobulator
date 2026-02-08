@@ -2,10 +2,14 @@ use std::f32::consts::PI;
 
 use avian2d::prelude as p;
 use bevy::app::PluginGroup as _;
+use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, ivec2, vec2};
 use bevy::prelude as b;
+use bevy::render::render_resource::{
+    Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+};
 use bevy::utils::default;
 use bevy_enhanced_input::prelude as bei;
 use bevy_enhanced_input::prelude::InputContextAppExt as _;
@@ -15,22 +19,38 @@ use rand::RngExt;
 
 fn main() {
     b::App::new()
-        .add_plugins(b::DefaultPlugins.set(bevy::audio::AudioPlugin {
-            default_spatial_scale: bevy::audio::SpatialScale::new_2d(0.001),
-            ..default()
-        }))
+        .add_plugins(
+            b::DefaultPlugins
+                .set(bevy::audio::AudioPlugin {
+                    default_spatial_scale: bevy::audio::SpatialScale::new_2d(0.001),
+                    ..default()
+                })
+                .set(b::ImagePlugin::default_nearest()),
+        )
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
         .add_input_context::<Player>()
         .add_plugins(avian2d::PhysicsPlugins::default())
         .add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
         //.add_plugins(player::player_plugin)
-        .add_systems(b::Startup, setup)
+        .add_systems(b::Startup, (setup_camera, setup_gameplay))
+        .add_systems(b::Update, fit_canvas_to_window)
         .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(b::FixedUpdate, expire_lifetimes)
         .add_systems(b::FixedUpdate, gun_cooldown)
         .add_observer(shoot)
         .run();
 }
+
+// -------------------------------------------------------------------------------------------------
+
+/// Size of UI enclosing playfield, for pixel rendering
+const SCREEN_SIZE: b::UVec2 = b::uvec2(640, 480);
+
+/// Size of the playfield
+const PLAYFIELD_SIZE: b::UVec2 = b::uvec2(320, 460);
+
+const PIXEL_LAYERS: RenderLayers = RenderLayers::layer(0);
+const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(1);
 
 // -------------------------------------------------------------------------------------------------
 
@@ -53,6 +73,23 @@ struct Gun {
 struct Lifetime(f32);
 
 // -------------------------------------------------------------------------------------------------
+// Rendering-related components
+// “Pixel perfect” setup per <https://github.com/bevyengine/bevy/blob/release-0.18.1/examples/2d/pixel_grid_snap.rs>
+
+/// Low-resolution texture that contains the pixel-perfect world.
+/// Canvas itself is rendered to the high-resolution world.
+#[derive(b::Component)]
+struct Canvas;
+
+/// Camera that renders the pixel-perfect world to the [`Canvas`].
+#[derive(b::Component)]
+struct InGameCamera;
+
+/// Camera that renders the [`Canvas`] (and other graphics on [`HIGH_RES_LAYERS`]) to the screen.
+#[derive(b::Component)]
+struct OuterCamera;
+
+// -------------------------------------------------------------------------------------------------
 
 #[derive(Debug, bei::InputAction)]
 #[action_output(b::Vec2)]
@@ -64,25 +101,90 @@ struct Shoot;
 
 // -------------------------------------------------------------------------------------------------
 
-fn setup(
+fn setup_camera(
     mut commands: b::Commands,
     mut windows: b::Query<&mut b::Window>,
-    asset_server: b::Res<b::AssetServer>,
+    mut images: b::ResMut<b::Assets<b::Image>>,
 ) {
-    eprintln!("setup");
-
     // reposition window for development
     windows.single_mut().unwrap().position = b::WindowPosition::At(ivec2(3000, 0));
 
-    // camera
-    commands.spawn(b::Camera2d::default());
+    // “Pixel perfect” setup per <https://github.com/bevyengine/bevy/blob/release-0.18.1/examples/2d/pixel_grid_snap.rs>
 
+    let canvas_size = Extent3d {
+        width: SCREEN_SIZE.x,
+        height: SCREEN_SIZE.y,
+        ..default()
+    };
+    let mut canvas = b::Image {
+        texture_descriptor: TextureDescriptor {
+            label: Some("canvas"),
+            size: canvas_size,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Bgra8UnormSrgb,
+            mip_level_count: 1,
+            sample_count: 1,
+            usage: TextureUsages::TEXTURE_BINDING
+                | TextureUsages::COPY_DST
+                | TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        },
+        ..default()
+    };
+
+    // Fill image.data with zeroes
+    canvas.resize(canvas_size);
+
+    let image_handle = images.add(canvas);
+
+    // This camera renders whatever is on `PIXEL_PERFECT_LAYERS` to the canvas
+    commands.spawn((
+        b::Camera2d,
+        b::Camera {
+            // Render before the "main pass" camera
+            order: -1,
+            clear_color: b::ClearColorConfig::Custom(bevy::color::palettes::css::GRAY.into()),
+            ..default()
+        },
+        bevy::camera::RenderTarget::Image(image_handle.clone().into()),
+        b::Msaa::Off,
+        InGameCamera,
+        PIXEL_LAYERS,
+    ));
+
+    commands.spawn((b::Sprite::from_image(image_handle), Canvas, HIGH_RES_LAYERS));
+    commands.spawn((b::Camera2d, b::Msaa::Off, OuterCamera, HIGH_RES_LAYERS));
+}
+
+/// Scales camera projection to fit the window (integer multiples only).
+fn fit_canvas_to_window(
+    mut resize_messages: b::MessageReader<bevy::window::WindowResized>,
+    windows: b::Query<&b::Window>,
+    mut projection: b::Single<&mut b::Projection, b::With<OuterCamera>>,
+) -> b::Result {
+    let b::Projection::Orthographic(projection) = &mut **projection else {
+        return Err(b::BevyError::from("projection not orthographic"));
+    };
+    for window_resized in resize_messages.read() {
+        // need physical size because that's what Camera2D relates to
+        let window = windows.get(window_resized.window)?;
+        let size = window.physical_size();
+        let margin = 0;
+        let h_scale = (size.x - margin) / SCREEN_SIZE.x;
+        let v_scale = (size.y - margin) / SCREEN_SIZE.y;
+        projection.scale = window.scale_factor() / (h_scale.min(v_scale).max(1) as f32);
+    }
+    Ok(())
+}
+
+fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer>) {
     // player sprite
     let player_sprite_asset = asset_server.load("player.png");
     commands.spawn((
         Player,
         b::Transform::from_xyz(0., 0., 0.),
         b::Sprite::from_image(player_sprite_asset.clone()),
+        PIXEL_LAYERS,
         bei::actions!(Player[
             (
                 bei::Action::<Move>::new(),
@@ -143,6 +245,7 @@ fn shoot(
             PlayerBullet,
             Lifetime(0.4),
             b::Sprite::from_image(asset_server.load("player-bullet.png")),
+            PIXEL_LAYERS,
             p::RigidBody::Kinematic,
             p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
             p::Collider::rectangle(4., 8.),
