@@ -10,6 +10,7 @@ use bevy::prelude as b;
 use bevy::utils::default;
 use bevy_enhanced_input::prelude as bei;
 use bevy_enhanced_input::prelude::InputContextAppExt as _;
+use rand::RngExt;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -149,6 +150,7 @@ fn shoot(
         b::PlaybackSettings {
             spatial: true,
             volume: bevy::audio::Volume::Decibels(-10.),
+            speed: rand::rng().random_range(0.5..=1.5),
             ..b::PlaybackSettings::DESPAWN
         },
         player_transform,
