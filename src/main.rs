@@ -19,6 +19,7 @@ fn main() {
         //.add_plugins(player::player_plugin)
         .add_systems(b::Startup, setup)
         .add_systems(b::FixedUpdate, apply_movement)
+        .add_systems(b::FixedUpdate, expire_lifetimes)
         .add_observer(shoot)
         .run();
 }
@@ -32,6 +33,10 @@ struct Player;
 
 #[derive(Debug, b::Component)]
 struct PlayerBullet;
+
+/// Decremented by game time and despawns the entity when it is zero
+#[derive(Debug, b::Component)]
+struct Lifetime(f32);
 
 // -------------------------------------------------------------------------------------------------
 
@@ -111,6 +116,7 @@ fn shoot(
 
     commands.spawn((
         PlayerBullet,
+        Lifetime(0.2),
         b::Sprite::from_image(asset_server.load("player-bullet.png")),
         p::RigidBody::Kinematic,
         p::LinearVelocity(vec2(0.0, 800.0)),
@@ -122,3 +128,19 @@ fn shoot(
 }
 
 // -------------------------------------------------------------------------------------------------
+
+fn expire_lifetimes(
+    mut commands: b::Commands,
+    time: b::Res<b::Time>,
+    query: b::Query<(b::Entity, &mut Lifetime)>,
+) {
+    let delta = time.delta_secs();
+    for (entity, mut lifetime) in query {
+        let new_lifetime = lifetime.0 - delta;
+        if new_lifetime > 0. {
+            lifetime.0 = new_lifetime;
+        } else {
+            commands.entity(entity).despawn();
+        }
+    }
+}
