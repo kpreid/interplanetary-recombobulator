@@ -304,14 +304,18 @@ fn expire_lifetimes(
 fn pickup_system(
     mut commands: b::Commands,
     player_collisions: b::Single<&p::CollidingEntities, b::With<Player>>,
-    pickups: b::Query<&Pickup>,
+    pickups: b::Query<(&Pickup, &b::Transform)>,
     mut fever: b::Single<&mut Quantity, b::With<Fever>>,
+    asset_server: b::Res<b::AssetServer>,
 ) -> b::Result {
     for &pickup_entity in &player_collisions.0 {
-        let Ok(pickup) = pickups.get(pickup_entity) else {
+        let Ok((pickup, &pickup_transform)) = pickups.get(pickup_entity) else {
             // not a pickup
             continue;
         };
+
+        let mut sound_asset = None;
+
         match *pickup {
             Pickup::Damage(amount) => {
                 // TODO: damage SFX
@@ -319,9 +323,23 @@ fn pickup_system(
             }
             Pickup::Cool(amount) => {
                 fever.adjust(-amount);
+                sound_asset = Some(asset_server.load("pickup.ogg"));
             }
         }
+
         commands.entity(pickup_entity).despawn();
+
+        if let Some(sound_asset) = sound_asset {
+            commands.spawn((
+                b::AudioPlayer::new(sound_asset),
+                b::PlaybackSettings {
+                    spatial: true,
+                    volume: bevy::audio::Volume::Decibels(-10.),
+                    ..b::PlaybackSettings::DESPAWN
+                },
+                pickup_transform,
+            ));
+        }
     }
     Ok(())
 }
