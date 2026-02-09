@@ -51,11 +51,12 @@ fn main() {
         .add_input_context::<Player>()
         .add_plugins(avian2d::PhysicsPlugins::default())
         .add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
-        .add_systems(b::Startup, (setup_camera, setup_gameplay))
+        .add_systems(b::Startup, (setup_camera, setup_gameplay, setup_ui))
         .add_systems(b::Update, fit_canvas_to_window)
         .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(b::FixedUpdate, expire_lifetimes)
         .add_systems(b::FixedUpdate, gun_cooldown)
+        .add_systems(b::FixedUpdate, quantity_behaviors)
         .add_observer(shoot)
         .run();
 }
@@ -110,6 +111,25 @@ struct Gun {
 /// Decremented by game time and despawns the entity when it is zero
 #[derive(Debug, b::Component)]
 struct Lifetime(f32);
+
+/// A value between 0 and 1 that is displayed to the player as a bar.
+/// Other components on this entity define which quantity it is and how systems affect it.
+#[derive(Debug, b::Component)]
+struct Quantity {
+    value: f32,
+}
+
+/// [`Quantity`] 1/3; affects shooting.
+#[derive(Debug, b::Component)]
+struct Coherence;
+
+/// [`Quantity`] 2/3; maxing it is game over.
+#[derive(Debug, b::Component)]
+struct Fever;
+
+/// [`Quantity`] 3/3; maxing it is a win.
+#[derive(Debug, b::Component)]
+struct Fervor;
 
 // -------------------------------------------------------------------------------------------------
 // Rendering-related components
@@ -215,6 +235,14 @@ fn fit_canvas_to_window(
     Ok(())
 }
 
+fn setup_ui(mut commands: b::Commands, asset_server: b::Res<b::AssetServer>) {
+    commands.spawn((
+        b::Sprite::from_image(asset_server.load("playfield-frame.png")),
+        b::Transform::from_xyz(0., 0., Zees::Frame.z()),
+    ));
+}
+
+/// Spawn the entities that participate in gameplay rules.
 fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer>) {
     // player sprite
     let player_sprite_asset = asset_server.load("player.png");
@@ -242,11 +270,12 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
         Gun { cooldown: 0.0 },
     ));
 
-    commands.spawn((
-        b::Sprite::from_image(asset_server.load("playfield-frame.png")),
-        b::Transform::from_xyz(0., 0., Zees::Frame.z()),
-    ));
+    commands.spawn((Coherence, Quantity { value: 0.0 }));
+    commands.spawn((Fever, Quantity { value: 0.5 }));
+    commands.spawn((Fervor, Quantity { value: 0.0 }));
 }
+
+// -------------------------------------------------------------------------------------------------
 
 fn apply_movement(
     action: b::Single<&bei::Action<Move>>,
@@ -339,4 +368,17 @@ fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
             gun.cooldown = new_cooldown;
         }
     }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+fn quantity_behaviors(
+    coherence: b::Single<
+        &mut Quantity,
+        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
+    >,
+    fever: b::Single<&mut Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
+    fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
+) -> b::Result {
+    Ok(())
 }
