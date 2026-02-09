@@ -241,9 +241,12 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
     for x in (-100..100).step_by(32) {
         for y in [100, 120, 240] {
             commands.spawn((
-                Attackable { health: 10 },
+                Attackable {
+                    health: 10,
+                    drops: true,
+                },
                 Pickup::Damage(0.1), // enemies damage if touched
-                b::Transform::from_xyz(x as f32, y as f32, 0.0),
+                b::Transform::from_xyz(x as f32, y as f32, Zees::Enemy.z()),
                 b::Sprite::from_image(player_sprite_asset.clone()), // TODO: enemy sprite
                 PLAYFIELD_LAYERS,
                 p::Collider::circle(8.),

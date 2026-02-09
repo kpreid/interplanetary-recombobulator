@@ -21,9 +21,11 @@ pub(crate) const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(2);
 
 /// Z position values for sprites for when disambiguation is needed
 pub(crate) enum Zees {
+    Pickup = -2,
     Bullets = -1,
-    Player = 0,
-    UiElement = 1,
+    Enemy = 0,
+    Player = 1,
+    UiElement = 2,
 }
 impl Zees {
     pub fn z(self) -> f32 {

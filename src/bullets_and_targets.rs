@@ -6,7 +6,7 @@ use bevy::utils::default;
 use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
 
-use crate::{Coherence, Fever, Lifetime, PLAYFIELD_LAYERS, Player, Quantity, Shoot, Zees};
+use crate::{Coherence, Fever, Lifetime, PLAYFIELD_LAYERS, Pickup, Player, Quantity, Shoot, Zees};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -16,7 +16,12 @@ pub(crate) struct PlayerBullet;
 /// Something that dies if shot.
 #[derive(Debug, b::Component)]
 pub(crate) struct Attackable {
+    /// Reduced by bullets, and when zero, this is despawned.
     pub health: u8,
+
+    /// If successfully killed, spawns beneficial [`crate::Pickup`]s.
+    /// (this may be more than a bool later)
+    pub drops: bool,
 }
 
 /// This entity has a gun! It might be the player ship or an enemy ship.
@@ -109,7 +114,8 @@ pub(crate) fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
 pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
     bullet_query: b::Query<(b::Entity, &p::CollidingEntities), b::With<PlayerBullet>>,
-    mut target_query: b::Query<&mut Attackable>,
+    mut target_query: b::Query<(&mut Attackable, &b::Transform)>,
+    asset_server: b::Res<b::AssetServer>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
     'bullet: for (bullet_entity, collisions) in bullet_query {
@@ -118,18 +124,35 @@ pub(crate) fn bullet_hit_system(
                 // already killed but not yet despawned; skip
                 continue 'colliding;
             }
-            let Ok(mut attackable) = target_query.get_mut(colliding_entity) else {
+            let Ok((mut attackable, attackable_transform)) = target_query.get_mut(colliding_entity)
+            else {
                 // collided but is not attackable
                 continue 'colliding;
             };
 
             let new_health = attackable.health.saturating_sub(1);
 
-            if new_health == 0 {
-                commands.entity(colliding_entity).despawn();
-                killed.insert(colliding_entity);
-            } else {
+            if new_health != 0 {
                 attackable.health = new_health;
+            } else {
+                killed.insert(colliding_entity);
+                commands.entity(colliding_entity).despawn();
+
+                // Spawn a pickup if we should
+                if attackable.drops {
+                    commands.spawn((
+                        b::Sprite::from_image(asset_server.load("pickup-cool.png")),
+                        Pickup::Cool(0.1),
+                        b::Transform::from_translation(
+                            attackable_transform.translation.with_z(Zees::Pickup.z()),
+                        ),
+                        PLAYFIELD_LAYERS,
+                        p::RigidBody::Kinematic,
+                        p::Collider::circle(5.),
+                        p::LinearVelocity(vec2(0.0, -70.0)),
+                        p::AngularVelocity(0.6),
+                    ));
+                }
             }
             commands.entity(bullet_entity).despawn();
             continue 'bullet; // each bullet hits only one entity
