@@ -91,6 +91,8 @@ const PLAYFIELD_RECT: b::Rect = b::Rect {
     max: vec2(PLAYFIELD_SIZE.x as f32 / 2., PLAYFIELD_SIZE.y as f32 / 2.),
 };
 
+/// We pretend the window is this many pixels smaller when computing the scale factor,
+/// to avoid the visual effect of sometimes just barely touching the window border
 const SCALING_MARGIN: u32 = 10;
 
 const PLAYFIELD_LAYERS: RenderLayers = RenderLayers::layer(0);
@@ -282,11 +284,18 @@ fn fit_canvas_to_window(
         return Err(b::BevyError::from("projection not orthographic"));
     };
     for window_resized in resize_messages.read() {
-        // need physical size because that's what Camera2D relates to
         let window = windows.get(window_resized.window)?;
+        let margin = if let bevy::window::WindowMode::Windowed = window.mode {
+            SCALING_MARGIN
+        } else {
+            0
+        };
+
+        // compute scale factor in physical pixels
         let size = window.physical_size();
-        let h_scale = (size.x - SCALING_MARGIN) / SCREEN_SIZE.x;
-        let v_scale = (size.y - SCALING_MARGIN) / SCREEN_SIZE.y;
+        let h_scale = (size.x - margin) / SCREEN_SIZE.x;
+        let v_scale = (size.y - margin) / SCREEN_SIZE.y;
+
         projection.scale = window.scale_factor() / (h_scale.min(v_scale).max(1) as f32);
     }
     Ok(())
