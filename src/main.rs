@@ -67,7 +67,8 @@ fn main() {
 /// Size of UI enclosing playfield, for pixel rendering
 const SCREEN_SIZE: b::UVec2 = b::uvec2(640, 480);
 
-/// Size of the playfield
+/// Size of the playfield.
+/// If you change this, the assets must be changed to match too
 const PLAYFIELD_SIZE: b::UVec2 = b::uvec2(320, 460);
 
 const PLAYFIELD_RECT: b::Rect = b::Rect {
@@ -79,6 +80,12 @@ const SCALING_MARGIN: u32 = 10;
 
 const PIXEL_LAYERS: RenderLayers = RenderLayers::layer(0);
 const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(1);
+
+/// Z position values for sprites for when disambiguation is needed
+enum Zees {
+    Player = 0,
+    Frame = 1,
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -213,7 +220,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
     let player_sprite_asset = asset_server.load("player.png");
     commands.spawn((
         Player,
-        b::Transform::from_xyz(0., 0., 0.),
+        b::Transform::from_xyz(0., 0., Zees::Player as i32 as f32),
         b::Sprite::from_image(player_sprite_asset.clone()),
         PIXEL_LAYERS,
         bei::actions!(Player[
@@ -232,6 +239,11 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
             )
         ]),
         Gun { cooldown: 0.0 },
+    ));
+
+    commands.spawn((
+        b::Sprite::from_image(asset_server.load("playfield-frame.png")),
+        b::Transform::from_xyz(0., 0., Zees::Frame as i32 as f32),
     ));
 }
 
