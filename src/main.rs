@@ -487,15 +487,22 @@ fn shoot(
 fn expire_lifetimes(
     mut commands: b::Commands,
     time: b::Res<b::Time>,
-    query: b::Query<(b::Entity, &mut Lifetime)>,
+    query: b::Query<(b::Entity, &mut Lifetime, b::Has<PlayerBullet>)>,
+    mut coherence: b::Single<
+        &mut Quantity,
+        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
+    >,
 ) {
     let delta = time.delta_secs();
-    for (entity, mut lifetime) in query {
+    for (entity, mut lifetime, is_bullet) in query {
         let new_lifetime = lifetime.0 - delta;
         if new_lifetime > 0. {
             lifetime.0 = new_lifetime;
         } else {
             commands.entity(entity).despawn();
+
+            // If this is a bullet, then if it expired, it is a miss; lose coherence.
+            coherence.value = (coherence.value - 0.01).clamp(0.0, 1.0);
         }
     }
 }
