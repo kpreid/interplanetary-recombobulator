@@ -236,8 +236,9 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
             (
                 bei::Action::<Shoot>::new(),
                 bei::bindings![b::KeyCode::Space, b::GamepadButton::South],
-            )
+            ),
         ]),
+        p::Collider::circle(8.),
         Gun { cooldown: 0.0 },
     ));
 
