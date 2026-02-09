@@ -4,11 +4,15 @@ use std::f32::consts::PI;
 
 use avian2d::prelude as p;
 use bevy::app::PluginGroup as _;
-use bevy::ecs::schedule::IntoScheduleConfigs as _;
+use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2, vec3};
 use bevy::prelude as b;
+use bevy::state::app::AppExtStates as _;
 use bevy::utils::default;
+use bevy_asset_loader::asset_collection::AssetCollection; // required by derive macro :(
+use bevy_asset_loader::loading_state::LoadingStateAppExt as _;
+use bevy_asset_loader::loading_state::config::ConfigureLoadingState as _;
 use bevy_enhanced_input::prelude as bei;
 use bevy_enhanced_input::prelude::InputContextAppExt as _;
 
@@ -56,6 +60,12 @@ fn main() {
                     ..default()
                 }),
         )
+        .init_state::<MyStates>()
+        .add_loading_state(
+            bevy_asset_loader::loading_state::LoadingState::new(MyStates::AssetLoading)
+                .continue_to_state(MyStates::Playing)
+                .load_collection::<Preload>(),
+        )
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
         .add_input_context::<Player>()
         .add_plugins(avian2d::PhysicsPlugins::default())
@@ -64,6 +74,7 @@ fn main() {
             b::Startup,
             (rendering::setup_camera_system, setup_gameplay, setup_ui).chain(),
         )
+        .add_systems(b::OnEnter(MyStates::Playing), spawn_enemies_system)
         .add_systems(b::Update, rendering::fit_canvas_to_window_system)
         .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(
@@ -74,7 +85,8 @@ fn main() {
                 pickup_system,
                 bullets_and_targets::bullet_hit_system,
             )
-                .chain(),
+                .chain()
+                .run_if(b::in_state(MyStates::Playing)), // must not run before assets loaded
         )
         .add_systems(
             b::FixedUpdate,
@@ -87,7 +99,10 @@ fn main() {
             )
                 .chain(),
         )
-        .add_systems(b::FixedUpdate, bullets_and_targets::gun_cooldown)
+        .add_systems(
+            b::FixedUpdate,
+            bullets_and_targets::gun_cooldown.run_if(b::in_state(MyStates::Playing)),
+        )
         .add_observer(bullets_and_targets::shoot)
         .run();
 }
@@ -127,6 +142,28 @@ enum Pickup {
     Cool(f32),
 }
 
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, b::States)]
+enum MyStates {
+    #[default]
+    AssetLoading,
+    Playing,
+}
+
+/// Assets that we use for things spawned after startup.
+#[derive(b::Resource, bevy_asset_loader::asset_collection::AssetCollection)]
+struct Preload {
+    #[asset(path = "player.png")] // TODO: enemy sprite
+    enemy_sprite: b::Handle<b::Image>,
+    #[asset(path = "player-bullet.png")]
+    player_bullet_sprite: b::Handle<b::Image>,
+    #[asset(path = "pickup-cool.png")]
+    pickup_cool_sprite: b::Handle<b::Image>,
+    #[asset(path = "pickup.ogg")]
+    pickup_sound: b::Handle<b::AudioSource>,
+    #[asset(path = "fire.ogg")]
+    shoot_sound: b::Handle<b::AudioSource>,
+}
+
 // -------------------------------------------------------------------------------------------------
 
 #[derive(Debug, bei::InputAction)]
@@ -138,6 +175,7 @@ struct Move;
 struct Shoot;
 
 // -------------------------------------------------------------------------------------------------
+// Startup systems
 
 fn setup_ui(
     mut commands: b::Commands,
@@ -206,7 +244,7 @@ fn bar_bundle(
     )
 }
 
-/// Spawn the entities that participate in gameplay rules.
+/// Spawn the entities that participate in gameplay rules and which exist forever.
 fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer>) {
     // player sprite
     let player_sprite_asset = asset_server.load("player.png");
@@ -237,7 +275,10 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
     commands.spawn((Coherence, Quantity { value: 0.5 }));
     commands.spawn((Fever, Quantity { value: 0.5 }));
     commands.spawn((Fervor, Quantity { value: 0.0 }));
+}
 
+/// Spawn the initial set of enemies
+fn spawn_enemies_system(mut commands: b::Commands, assets: b::Res<crate::Preload>) {
     for x in (-100..100).step_by(32) {
         for y in [100, 120, 240] {
             commands.spawn((
@@ -247,7 +288,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
                 },
                 Pickup::Damage(0.1), // enemies damage if touched
                 b::Transform::from_xyz(x as f32, y as f32, Zees::Enemy.z()),
-                b::Sprite::from_image(player_sprite_asset.clone()), // TODO: enemy sprite
+                b::Sprite::from_image(assets.enemy_sprite.clone()), // TODO: enemy sprite
                 PLAYFIELD_LAYERS,
                 p::Collider::circle(8.),
                 Gun { cooldown: 0.0 },
@@ -306,7 +347,7 @@ fn pickup_system(
     player_collisions: b::Single<&p::CollidingEntities, b::With<Player>>,
     pickups: b::Query<(&Pickup, &b::Transform)>,
     mut fever: b::Single<&mut Quantity, b::With<Fever>>,
-    asset_server: b::Res<b::AssetServer>,
+    assets: b::Res<crate::Preload>,
 ) -> b::Result {
     for &pickup_entity in &player_collisions.0 {
         let Ok((pickup, &pickup_transform)) = pickups.get(pickup_entity) else {
@@ -323,7 +364,7 @@ fn pickup_system(
             }
             Pickup::Cool(amount) => {
                 fever.adjust(-amount);
-                sound_asset = Some(asset_server.load("pickup.ogg"));
+                sound_asset = Some(assets.pickup_sound.clone());
             }
         }
 

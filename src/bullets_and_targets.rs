@@ -41,7 +41,7 @@ pub(crate) fn shoot(
     gun_query: b::Query<(&b::Transform, &mut Gun), b::With<Player>>,
     coherence_query: b::Single<&Quantity, (b::With<Coherence>, b::Without<Fever>)>,
     mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
-    asset_server: b::Res<b::AssetServer>,
+    assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let (player_transform, mut gun) = gun_query.single_inner()?;
 
@@ -65,7 +65,7 @@ pub(crate) fn shoot(
         commands.spawn((
             PlayerBullet,
             Lifetime(0.4),
-            b::Sprite::from_image(asset_server.load("player-bullet.png")),
+            b::Sprite::from_image(assets.player_bullet_sprite.clone()),
             PLAYFIELD_LAYERS,
             p::RigidBody::Kinematic,
             p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
@@ -82,7 +82,7 @@ pub(crate) fn shoot(
     }
 
     commands.spawn((
-        b::AudioPlayer::new(asset_server.load("fire.ogg")),
+        b::AudioPlayer::new(assets.shoot_sound.clone()),
         b::PlaybackSettings {
             spatial: true,
             volume: bevy::audio::Volume::Decibels(-10.),
@@ -115,7 +115,7 @@ pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
     bullet_query: b::Query<(b::Entity, &p::CollidingEntities), b::With<PlayerBullet>>,
     mut target_query: b::Query<(&mut Attackable, &b::Transform)>,
-    asset_server: b::Res<b::AssetServer>,
+    assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
     'bullet: for (bullet_entity, collisions) in bullet_query {
@@ -141,7 +141,7 @@ pub(crate) fn bullet_hit_system(
                 // Spawn a pickup if we should
                 if attackable.drops {
                     commands.spawn((
-                        b::Sprite::from_image(asset_server.load("pickup-cool.png")),
+                        b::Sprite::from_image(assets.pickup_cool_sprite.clone()),
                         Pickup::Cool(0.1),
                         b::Transform::from_translation(
                             attackable_transform.translation.with_z(Zees::Pickup.z()),
