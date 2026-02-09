@@ -5,7 +5,7 @@ use bevy::app::PluginGroup as _;
 use bevy::camera::visibility::RenderLayers;
 use bevy::color::Alpha as _;
 use bevy::ecs::spawn::SpawnRelated as _;
-use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2};
+use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2, vec3};
 use bevy::prelude as b;
 use bevy::render::render_resource::{
     Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
@@ -51,7 +51,7 @@ fn main() {
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
         .add_input_context::<Player>()
         .add_plugins(avian2d::PhysicsPlugins::default())
-        .add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
+        //.add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
         .add_systems(b::Startup, (setup_camera, setup_gameplay, setup_ui))
         .add_systems(b::Update, fit_canvas_to_window)
         .add_systems(b::FixedUpdate, apply_movement)
@@ -305,7 +305,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
         Gun { cooldown: 0.0 },
     ));
 
-    commands.spawn((Coherence, Quantity { value: 0.0 }));
+    commands.spawn((Coherence, Quantity { value: 0.5 }));
     commands.spawn((Fever, Quantity { value: 0.5 }));
     commands.spawn((Fervor, Quantity { value: 0.0 }));
 }
@@ -332,21 +332,28 @@ fn shoot(
     _shoot: b::On<bei::Fire<Shoot>>,
     mut commands: b::Commands,
     gun_query: b::Query<(&b::Transform, &mut Gun)>,
+    coherence_query: b::Single<&Quantity, b::With<Coherence>>,
     asset_server: b::Res<b::AssetServer>,
 ) -> b::Result {
     let (player_transform, mut gun) = gun_query.single_inner()?;
-
-    let mut origin_of_bullets_transform: b::Transform = *player_transform;
-    origin_of_bullets_transform.translation.z = Zees::Bullets.z();
 
     if gun.cooldown != 0.0 {
         return Ok(());
     }
 
-    for bullet_angle_deg in (-15..=15).step_by(5) {
-        let bullet_angle_rad = (bullet_angle_deg as f32).to_radians();
+    let mut origin_of_bullets_transform: b::Transform = *player_transform;
+    origin_of_bullets_transform.translation.z = Zees::Bullets.z();
 
-        let speed = rand::rng().random_range(500.0..=1000.0);
+    let coherence = coherence_query.value;
+
+    let bullet_scale = vec2(1.0, 1.0 + coherence.powi(2) * 10.0);
+    let base_bullet_speed = 800.0 + coherence.powi(2) * 10.0;
+    let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
+
+    for bullet_angle_index in -3..=3 {
+        let bullet_angle_rad = (bullet_angle_index as f32 * bullet_angle_step_rad);
+
+        let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
         commands.spawn((
             PlayerBullet,
             Lifetime(0.4),
@@ -354,9 +361,14 @@ fn shoot(
             PIXEL_LAYERS,
             p::RigidBody::Kinematic,
             p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
-            p::Collider::rectangle(4., 8.),
+            // constants are sprite size
+            p::Collider::rectangle(4. * bullet_scale.x, 8. * bullet_scale.y),
             origin_of_bullets_transform
-                * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad)),
+                * b::Transform {
+                    rotation: b::Quat::from_rotation_z(bullet_angle_rad),
+                    scale: bullet_scale.extend(1.0),
+                    ..default()
+                },
         ));
     }
     commands.spawn((
