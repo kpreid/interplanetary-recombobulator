@@ -134,7 +134,7 @@ struct Player;
 #[derive(Debug, b::Component)]
 struct EnemySpawner {
     cooldown: f32,
-    position_state: u32,
+    spawn_pattern_state: usize,
 }
 
 /// Decremented by game time and despawns the entity when it is zero
@@ -302,7 +302,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
 
     commands.spawn(EnemySpawner {
         cooldown: 0.0,
-        position_state: 0,
+        spawn_pattern_state: 0,
     });
 }
 
@@ -425,24 +425,42 @@ fn spawn_enemies_system(
     spawners: b::Query<&mut EnemySpawner>,
     assets: b::Res<crate::Preload>,
 ) {
+    const SPAWN_PATTERN: [[u8; 10]; 10] = [
+        *b" X X  X X ",
+        *b"  X    X  ",
+        *b" X X  X X ",
+        *b"          ",
+        *b"          ",
+        *b"   XXXX   ",
+        *b"   X  X   ",
+        *b"  X XX X  ",
+        *b"   X  X   ",
+        *b"          ",
+    ];
+
     let delta = time.delta_secs();
     for mut spawner in spawners {
         let EnemySpawner {
             cooldown,
-            position_state,
+            spawn_pattern_state,
         }: &mut EnemySpawner = &mut *spawner;
         if *cooldown > 0.0 {
             *cooldown = (*cooldown - delta).max(0.0);
         } else {
             *cooldown = 2.0;
-            commands.spawn(enemy_bundle(
-                &assets,
-                vec2(
-                    PLAYFIELD_RECT.min.x + *position_state as f32,
-                    PLAYFIELD_RECT.max.y,
-                ),
-            ));
-            *position_state = (*position_state + 10).rem_euclid(PLAYFIELD_SIZE.x);
+            let row_to_spawn = &SPAWN_PATTERN[*spawn_pattern_state % SPAWN_PATTERN.len()];
+            *spawn_pattern_state = (*spawn_pattern_state + 1) % SPAWN_PATTERN.len();
+
+            for (i, &ch) in row_to_spawn.iter().enumerate() {
+                let x = PLAYFIELD_RECT.min.x + i as f32 * (PLAYFIELD_RECT.size().x / (row_to_spawn.len() - 1) as f32);
+                match ch {
+                    b' ' => {}
+                    b'X' => {
+                        commands.spawn(enemy_bundle(&assets, vec2(x, PLAYFIELD_RECT.max.y)));
+                    }
+                    _ => unreachable!(),
+                }
+            }
         }
     }
 }
