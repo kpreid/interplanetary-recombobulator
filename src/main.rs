@@ -74,7 +74,6 @@ fn main() {
             b::Startup,
             (rendering::setup_camera_system, setup_gameplay, setup_ui).chain(),
         )
-        .add_systems(b::OnEnter(MyStates::Playing), spawn_enemies_system)
         .add_systems(b::OnEnter(MyStates::Playing), unpause)
         .add_systems(b::OnExit(MyStates::Playing), pause)
         .add_observer(pause_unpause_observer)
@@ -104,7 +103,8 @@ fn main() {
         )
         .add_systems(
             b::FixedUpdate,
-            bullets_and_targets::gun_cooldown.run_if(b::in_state(MyStates::Playing)),
+            (bullets_and_targets::gun_cooldown, spawn_enemies_system)
+                .run_if(b::in_state(MyStates::Playing)),
         )
         .add_observer(bullets_and_targets::shoot)
         .run();
@@ -130,6 +130,12 @@ const PLAYFIELD_RECT: b::Rect = b::Rect {
 #[derive(Debug, b::Component)]
 #[require(b::Transform, p::CollidingEntities)]
 struct Player;
+
+#[derive(Debug, b::Component)]
+struct EnemySpawner {
+    cooldown: f32,
+    position_state: u32,
+}
 
 /// Decremented by game time and despawns the entity when it is zero
 #[derive(Debug, b::Component)]
@@ -293,26 +299,11 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
     commands.spawn((Coherence, Quantity { value: 1.0 }));
     commands.spawn((Fever, Quantity { value: 0.5 }));
     commands.spawn((Fervor, Quantity { value: 0.0 }));
-}
 
-/// Spawn the initial set of enemies
-fn spawn_enemies_system(mut commands: b::Commands, assets: b::Res<crate::Preload>) {
-    for x in (-100..100).step_by(32) {
-        for y in [100, 120, 240] {
-            commands.spawn((
-                Attackable {
-                    health: 10,
-                    drops: true,
-                },
-                Pickup::Damage(0.1), // enemies damage if touched
-                b::Transform::from_xyz(x as f32, y as f32, Zees::Enemy.z()),
-                b::Sprite::from_image(assets.enemy_sprite.clone()), // TODO: enemy sprite
-                PLAYFIELD_LAYERS,
-                p::Collider::circle(8.),
-                Gun { cooldown: 0.0 },
-            ));
-        }
-    }
+    commands.spawn(EnemySpawner {
+        cooldown: 0.0,
+        position_state: 0,
+    });
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -424,4 +415,51 @@ fn pickup_system(
         }
     }
     Ok(())
+}
+
+// -------------------------------------------------------------------------------------------------
+
+fn spawn_enemies_system(
+    mut commands: b::Commands,
+    time: b::Res<b::Time>,
+    spawners: b::Query<&mut EnemySpawner>,
+    assets: b::Res<crate::Preload>,
+) {
+    let delta = time.delta_secs();
+    for mut spawner in spawners {
+        let EnemySpawner {
+            cooldown,
+            position_state,
+        }: &mut EnemySpawner = &mut *spawner;
+        if *cooldown > 0.0 {
+            *cooldown = (*cooldown - delta).max(0.0);
+        } else {
+            *cooldown = 2.0;
+            commands.spawn(enemy_bundle(
+                &assets,
+                vec2(
+                    PLAYFIELD_RECT.min.x + *position_state as f32,
+                    PLAYFIELD_RECT.max.y,
+                ),
+            ));
+            *position_state = (*position_state + 10).rem_euclid(PLAYFIELD_SIZE.x);
+        }
+    }
+}
+
+fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
+    (
+        Attackable {
+            health: 10,
+            drops: true,
+        },
+        Pickup::Damage(0.1), // enemies damage if touched
+        b::Transform::from_translation(position.extend(Zees::Enemy.z())),
+        b::Sprite::from_image(assets.enemy_sprite.clone()),
+        PLAYFIELD_LAYERS,
+        p::RigidBody::Kinematic,
+        p::Collider::circle(8.),
+        p::LinearVelocity(vec2(0.0, -40.0)),
+        Gun { cooldown: 0.0 },
+    )
 }
