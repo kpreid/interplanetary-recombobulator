@@ -82,6 +82,7 @@ const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(1);
 
 /// Z position values for sprites for when disambiguation is needed
 enum Zees {
+    Bullets = -1,
     Player = 0,
     Frame = 1,
 }
@@ -270,7 +271,9 @@ fn shoot(
     asset_server: b::Res<b::AssetServer>,
 ) -> b::Result {
     let (player_transform, mut gun) = gun_query.single_inner()?;
-    let player_transform: b::Transform = *player_transform;
+
+    let mut origin_of_bullets_transform: b::Transform = *player_transform;
+    origin_of_bullets_transform.translation.z = Zees::Bullets.z();
 
     if gun.cooldown != 0.0 {
         return Ok(());
@@ -288,7 +291,7 @@ fn shoot(
             p::RigidBody::Kinematic,
             p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
             p::Collider::rectangle(4., 8.),
-            player_transform
+            origin_of_bullets_transform
                 * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad)),
         ));
     }
@@ -300,7 +303,7 @@ fn shoot(
             speed: rand::rng().random_range(0.5..=1.5),
             ..b::PlaybackSettings::DESPAWN
         },
-        player_transform,
+        origin_of_bullets_transform,
     ));
 
     gun.cooldown = 0.25;
