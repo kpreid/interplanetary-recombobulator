@@ -160,7 +160,7 @@ struct Preload {
     pickup_cool_sprite: b::Handle<b::Image>,
     #[asset(path = "pickup.ogg")]
     pickup_sound: b::Handle<b::AudioSource>,
-    #[asset(path = "fire.ogg")]
+    #[asset(path = "shoot.ogg")]
     shoot_sound: b::Handle<b::AudioSource>,
 }
 
