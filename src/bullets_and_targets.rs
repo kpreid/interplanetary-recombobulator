@@ -89,7 +89,7 @@ pub(crate) fn shoot(
 
     // Side effects of firing besides a bullet.
     gun.cooldown = 0.25;
-    fever_query.value = (fever_query.value + 0.1 * coherence).clamp(0.0, 1.0);
+    fever_query.adjust(0.1 * coherence);
 
     Ok(())
 }

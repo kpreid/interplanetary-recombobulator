@@ -31,6 +31,25 @@ pub(crate) struct UpdateFromQuantity(pub b::Entity);
 
 // -------------------------------------------------------------------------------------------------
 
+impl Quantity {
+    pub fn adjust(&mut self, delta: f32) {
+        self.set_clamped(self.value + delta);
+    }
+
+    pub fn set_clamped(&mut self, value: f32) {
+        if value.is_nan() {
+            if cfg!(debug_assertions) {
+                panic!("NaN value");
+            } else {
+                return;
+            }
+        }
+        self.value = value.clamp(0.0, 1.0);
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 #[expect(unused_variables)]
 pub(crate) fn quantity_behaviors_system(
     coherence: b::Single<

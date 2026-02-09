@@ -69,7 +69,12 @@ fn main() {
         .add_systems(
             b::FixedUpdate,
             // put these in *some* order for consistency
-            (expire_lifetimes, bullets_and_targets::bullet_hit_system).chain(),
+            (
+                expire_lifetimes,
+                pickup_system,
+                bullets_and_targets::bullet_hit_system,
+            )
+                .chain(),
         )
         .add_systems(
             b::FixedUpdate,
@@ -105,12 +110,22 @@ const PLAYFIELD_RECT: b::Rect = b::Rect {
 
 /// Player ship entity
 #[derive(Debug, b::Component)]
-#[require(b::Transform)]
+#[require(b::Transform, p::CollidingEntities)]
 struct Player;
 
 /// Decremented by game time and despawns the entity when it is zero
 #[derive(Debug, b::Component)]
 struct Lifetime(f32);
+
+/// On colliding with [`Player`], has an effect and despawns the entity.
+/// This is used for both pickups and colliding with enemies.
+#[derive(Debug, b::Component)]
+enum Pickup {
+    /// Increase [`Fever`] by this amount, and depict it as a damaging hit.
+    Damage(f32),
+    /// Decrease [`Fever`] by this amount.
+    Cool(f32),
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -227,6 +242,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
         for y in [100, 120, 240] {
             commands.spawn((
                 Attackable { health: 10 },
+                Pickup::Damage(0.1), // enemies damage if touched
                 b::Transform::from_xyz(x as f32, y as f32, 0.0),
                 b::Sprite::from_image(player_sprite_asset.clone()), // TODO: enemy sprite
                 PLAYFIELD_LAYERS,
@@ -276,8 +292,33 @@ fn expire_lifetimes(
 
             // If this is a bullet, then if it expired, it is a miss; lose coherence.
             if is_bullet {
-                coherence.value = (coherence.value - 0.01).clamp(0.0, 1.0);
+                coherence.adjust(-0.01);
             }
         }
     }
+}
+
+fn pickup_system(
+    mut commands: b::Commands,
+    player_collisions: b::Single<&p::CollidingEntities, b::With<Player>>,
+    pickups: b::Query<&Pickup>,
+    mut fever: b::Single<&mut Quantity, b::With<Fever>>,
+) -> b::Result {
+    for &pickup_entity in &player_collisions.0 {
+        let Ok(pickup) = pickups.get(pickup_entity) else {
+            // not a pickup
+            continue;
+        };
+        match *pickup {
+            Pickup::Damage(amount) => {
+                // TODO: damage SFX
+                fever.adjust(amount);
+            }
+            Pickup::Cool(amount) => {
+                fever.adjust(-amount);
+            }
+        }
+        commands.entity(pickup_entity).despawn();
+    }
+    Ok(())
 }
