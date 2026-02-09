@@ -124,15 +124,17 @@ pub(crate) fn bullet_hit_system(
                 // already killed but not yet despawned; skip
                 continue 'colliding;
             }
-            let Ok((mut attackable, attackable_transform)) = target_query.get_mut(colliding_entity)
+            let Ok((mut attackable, &attackable_transform)) =
+                target_query.get_mut(colliding_entity)
             else {
                 // collided but is not attackable
                 continue 'colliding;
             };
 
             let new_health = attackable.health.saturating_sub(1);
+            let is_killed = new_health == 0;
 
-            if new_health != 0 {
+            if !is_killed {
                 attackable.health = new_health;
             } else {
                 killed.insert(colliding_entity);
@@ -154,8 +156,28 @@ pub(crate) fn bullet_hit_system(
                     ));
                 }
             }
+
+            // Play death or hurt sound
+            commands.spawn((
+                b::AudioPlayer::new(
+                    if is_killed {
+                        &assets.enemy_kill_sound
+                    } else {
+                        &assets.enemy_hurt_sound
+                    }
+                    .clone(),
+                ),
+                b::PlaybackSettings {
+                    spatial: true,
+                    volume: bevy::audio::Volume::Decibels(-10.),
+                    ..b::PlaybackSettings::DESPAWN
+                },
+                attackable_transform,
+            ));
+
+            // each bullet hits at most one entity and dies
             commands.entity(bullet_entity).despawn();
-            continue 'bullet; // each bullet hits only one entity
+            continue 'bullet; // don't hit anything else
         }
     }
     Ok(())

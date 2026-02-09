@@ -158,14 +158,20 @@ enum MyStates {
 struct Preload {
     #[asset(path = "player.png")] // TODO: enemy sprite
     enemy_sprite: b::Handle<b::Image>,
+    #[asset(path = "enemy-hurt.ogg")]
+    enemy_hurt_sound: b::Handle<b::AudioSource>,
+    #[asset(path = "enemy-kill.ogg")]
+    enemy_kill_sound: b::Handle<b::AudioSource>,
+
     #[asset(path = "player-bullet.png")]
     player_bullet_sprite: b::Handle<b::Image>,
+    #[asset(path = "shoot.ogg")]
+    shoot_sound: b::Handle<b::AudioSource>,
+
     #[asset(path = "pickup-cool.png")]
     pickup_cool_sprite: b::Handle<b::Image>,
     #[asset(path = "pickup.ogg")]
     pickup_sound: b::Handle<b::AudioSource>,
-    #[asset(path = "shoot.ogg")]
-    shoot_sound: b::Handle<b::AudioSource>,
 }
 
 // -------------------------------------------------------------------------------------------------
