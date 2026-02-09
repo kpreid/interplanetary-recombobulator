@@ -3,7 +3,6 @@ use std::f32::consts::PI;
 use avian2d::prelude as p;
 use bevy::app::PluginGroup as _;
 use bevy::camera::visibility::RenderLayers;
-use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2};
 use bevy::prelude as b;
@@ -86,6 +85,11 @@ enum Zees {
     Player = 0,
     Frame = 1,
 }
+impl Zees {
+    fn z(self) -> f32 {
+        self as i32 as f32
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -136,11 +140,7 @@ struct Shoot;
 
 // -------------------------------------------------------------------------------------------------
 
-fn setup_camera(
-    mut commands: b::Commands,
-    mut windows: b::Query<&mut b::Window>,
-    mut images: b::ResMut<b::Assets<b::Image>>,
-) {
+fn setup_camera(mut commands: b::Commands, mut images: b::ResMut<b::Assets<b::Image>>) {
     // “Pixel perfect” setup per <https://github.com/bevyengine/bevy/blob/release-0.18.1/examples/2d/pixel_grid_snap.rs>
 
     let canvas_size = Extent3d {
@@ -220,7 +220,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
     let player_sprite_asset = asset_server.load("player.png");
     commands.spawn((
         Player,
-        b::Transform::from_xyz(0., 0., Zees::Player as i32 as f32),
+        b::Transform::from_xyz(0., 0., Zees::Player.z()),
         b::Sprite::from_image(player_sprite_asset.clone()),
         PIXEL_LAYERS,
         bei::actions!(Player[
@@ -243,7 +243,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
 
     commands.spawn((
         b::Sprite::from_image(asset_server.load("playfield-frame.png")),
-        b::Transform::from_xyz(0., 0., Zees::Frame as i32 as f32),
+        b::Transform::from_xyz(0., 0., Zees::Frame.z()),
     ));
 }
 
