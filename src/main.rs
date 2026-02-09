@@ -5,7 +5,7 @@ use bevy::app::PluginGroup as _;
 use bevy::camera::visibility::RenderLayers;
 use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
-use bevy::math::{Vec2, ivec2, vec2};
+use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2};
 use bevy::prelude as b;
 use bevy::render::render_resource::{
     Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
@@ -69,6 +69,11 @@ const SCREEN_SIZE: b::UVec2 = b::uvec2(640, 480);
 
 /// Size of the playfield
 const PLAYFIELD_SIZE: b::UVec2 = b::uvec2(320, 460);
+
+const PLAYFIELD_RECT: b::Rect = b::Rect {
+    min: vec2(PLAYFIELD_SIZE.x as f32 / -2., PLAYFIELD_SIZE.y as f32 / -2.),
+    max: vec2(PLAYFIELD_SIZE.x as f32 / 2., PLAYFIELD_SIZE.y as f32 / 2.),
+};
 
 const SCALING_MARGIN: u32 = 10;
 
@@ -232,13 +237,16 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
 
 fn apply_movement(
     action: b::Single<&bei::Action<Move>>,
+    time: b::Res<b::Time>,
     player_query: b::Query<&mut b::Transform, b::With<Player>>,
 ) -> b::Result {
     let movement: b::Vec2 = ***action;
-    let movement = movement * 5.0;
+    let delta_position = movement * 150.0 * time.delta_secs(); // apply speed
     for mut transform in player_query {
-        transform.translation.x += movement.x;
-        transform.translation.y += movement.y;
+        let new_position: b::Vec2 = (transform.translation.xy() + delta_position)
+            .clamp(PLAYFIELD_RECT.min, PLAYFIELD_RECT.max);
+        transform.translation.x = new_position.x;
+        transform.translation.y = new_position.y;
     }
     Ok(())
 }
