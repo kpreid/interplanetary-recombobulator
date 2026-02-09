@@ -89,8 +89,9 @@ const PLAYFIELD_RECT: b::Rect = b::Rect {
 
 const SCALING_MARGIN: u32 = 10;
 
-const PIXEL_LAYERS: RenderLayers = RenderLayers::layer(0);
-const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(1);
+const PLAYFIELD_LAYERS: RenderLayers = RenderLayers::layer(0);
+const UI_LAYERS: RenderLayers = RenderLayers::layer(1);
+const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(2);
 
 /// Z position values for sprites for when disambiguation is needed
 enum Zees {
@@ -159,9 +160,14 @@ struct UpdateFromQuantity(b::Entity);
 #[derive(b::Component)]
 struct Canvas;
 
-/// Camera that renders the pixel-perfect world to the [`Canvas`].
+/// Camera that renders the gameplay objects to the [`Canvas`].
+/// Has a restricted viewport to crop objects.
 #[derive(b::Component)]
-struct InGameCamera;
+struct PlayfieldCamera;
+
+/// Camera that renders the UI objects to the [`Canvas`].
+#[derive(b::Component)]
+struct UiCamera;
 
 /// Camera that renders the [`Canvas`] (and other graphics on [`HIGH_RES_LAYERS`]) to the screen.
 #[derive(b::Component)]
@@ -206,24 +212,46 @@ fn setup_camera(mut commands: b::Commands, mut images: b::ResMut<b::Assets<b::Im
     // Fill image.data with zeroes
     canvas.resize(canvas_size);
 
-    let image_handle = images.add(canvas);
+    let pixel_camera_image_handle = images.add(canvas);
 
-    // This camera renders whatever is on `PIXEL_PERFECT_LAYERS` to the canvas
+    commands.spawn((
+        b::Camera2d,
+        b::Camera {
+            // Render before the "main pass" camera and before the UI too
+            order: -2,
+            clear_color: b::ClearColorConfig::Custom(bevy::color::palettes::css::GRAY.into()),
+            viewport: Some(bevy::camera::Viewport {
+                physical_position: (SCREEN_SIZE - PLAYFIELD_SIZE) / 2,
+                physical_size: PLAYFIELD_SIZE,
+                ..default()
+            }),
+            ..default()
+        },
+        bevy::camera::RenderTarget::Image(pixel_camera_image_handle.clone().into()),
+        b::Msaa::Off,
+        PlayfieldCamera,
+        PLAYFIELD_LAYERS,
+    ));
+
     commands.spawn((
         b::Camera2d,
         b::Camera {
             // Render before the "main pass" camera
             order: -1,
-            clear_color: b::ClearColorConfig::Custom(bevy::color::palettes::css::GRAY.into()),
+            clear_color: b::ClearColorConfig::None,
             ..default()
         },
-        bevy::camera::RenderTarget::Image(image_handle.clone().into()),
+        bevy::camera::RenderTarget::Image(pixel_camera_image_handle.clone().into()),
         b::Msaa::Off,
-        InGameCamera,
-        PIXEL_LAYERS,
+        UiCamera,
+        UI_LAYERS,
     ));
 
-    commands.spawn((b::Sprite::from_image(image_handle), Canvas, HIGH_RES_LAYERS));
+    commands.spawn((
+        b::Sprite::from_image(pixel_camera_image_handle),
+        Canvas,
+        HIGH_RES_LAYERS,
+    ));
     commands.spawn((b::Camera2d, b::Msaa::Off, OuterCamera, HIGH_RES_LAYERS));
 
     // Spatial audio listener (*not* attached to the player ship)
@@ -264,6 +292,7 @@ fn setup_ui(
     commands.spawn((
         b::Sprite::from_image(asset_server.load("playfield-frame.png")),
         b::Transform::from_xyz(0., 0., Zees::UiElement.z()),
+        UI_LAYERS,
     ));
 
     let bar_fill_image = asset_server.load("bar-fill.png");
@@ -301,12 +330,14 @@ fn bar_bundle(
                 b::Sprite::from_image(bar_fill_image.clone()),
                 bevy::sprite::Anchor::CENTER_LEFT,
                 UpdateFromQuantity(quantity_entity),
+                UI_LAYERS,
             ),
             (
                 b::Text2d::new(label),
                 b::TextLayout::new_with_justify(b::Justify::Left),
                 bevy::sprite::Anchor::CENTER_LEFT,
-                b::Transform::from_translation(vec3(0.0, 20.0, 0.0))
+                b::Transform::from_translation(vec3(0.0, 20.0, 0.0)),
+                UI_LAYERS,
             )
         ],
         b::Transform {
@@ -325,7 +356,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
         Player,
         b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, Zees::Player.z()),
         b::Sprite::from_image(player_sprite_asset.clone()),
-        PIXEL_LAYERS,
+        PLAYFIELD_LAYERS,
         bei::actions!(Player[
             (
                 bei::Action::<Move>::new(),
@@ -399,7 +430,7 @@ fn shoot(
             PlayerBullet,
             Lifetime(0.4),
             b::Sprite::from_image(asset_server.load("player-bullet.png")),
-            PIXEL_LAYERS,
+            PLAYFIELD_LAYERS,
             p::RigidBody::Kinematic,
             p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
             // constants are sprite size
@@ -463,6 +494,7 @@ fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
 
 // -------------------------------------------------------------------------------------------------
 
+#[expect(unused_variables)]
 fn quantity_behaviors(
     coherence: b::Single<
         &mut Quantity,
@@ -478,7 +510,7 @@ fn update_quantity_display_system_1(
     //coherence: b::Single<&Quantity, b::With<Coherence>>,
     fever: b::Single<&Quantity, b::With<Fever>>,
     //fervor: b::Single<&Quantity, b::With<Fervor>>,
-    mut pixel_camera: b::Single<&mut b::Camera, b::With<InGameCamera>>,
+    mut pixel_camera: b::Single<&mut b::Camera, b::With<PlayfieldCamera>>,
 ) -> b::Result {
     pixel_camera.clear_color = bevy::camera::ClearColorConfig::Custom(b::Color::oklch(
         fever.value * 0.05,
