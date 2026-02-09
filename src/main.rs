@@ -2,7 +2,7 @@
 
 use std::f32::consts::PI;
 
-use avian2d::prelude as p;
+use avian2d::prelude::{self as p, PhysicsTime as _};
 use bevy::app::PluginGroup as _;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::spawn::SpawnRelated as _;
@@ -75,6 +75,9 @@ fn main() {
             (rendering::setup_camera_system, setup_gameplay, setup_ui).chain(),
         )
         .add_systems(b::OnEnter(MyStates::Playing), spawn_enemies_system)
+        .add_systems(b::OnEnter(MyStates::Playing), unpause)
+        .add_systems(b::OnExit(MyStates::Playing), pause)
+        .add_observer(pause_unpause_observer)
         .add_systems(b::Update, rendering::fit_canvas_to_window_system)
         .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(
@@ -147,6 +150,7 @@ enum MyStates {
     #[default]
     AssetLoading,
     Playing,
+    Paused,
 }
 
 /// Assets that we use for things spawned after startup.
@@ -173,6 +177,10 @@ struct Move;
 #[derive(Debug, bei::InputAction)]
 #[action_output(bool)]
 struct Shoot;
+
+#[derive(Debug, bei::InputAction)]
+#[action_output(bool)]
+struct Escape;
 
 // -------------------------------------------------------------------------------------------------
 // Startup systems
@@ -267,6 +275,10 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
                 bei::Action::<Shoot>::new(),
                 bei::bindings![b::KeyCode::Space, b::GamepadButton::South],
             ),
+            (
+                bei::Action::<Escape>::new(),
+                bei::bindings![b::KeyCode::Escape, b::GamepadButton::Start],
+            )
         ]),
         p::Collider::circle(8.),
         Gun { cooldown: 0.0 },
@@ -313,6 +325,29 @@ fn apply_movement(
         transform.translation.y = new_position.y;
     }
     Ok(())
+}
+
+// -------------------------------------------------------------------------------------------------
+// Other game behaviors use `run_if`; physics pausing needs explicit action
+
+fn pause(mut time: b::ResMut<b::Time<p::Physics>>) {
+    time.pause();
+}
+
+fn unpause(mut time: b::ResMut<b::Time<p::Physics>>) {
+    time.unpause();
+}
+
+fn pause_unpause_observer(
+    _event: b::On<bei::Start<Escape>>,
+    state: b::ResMut<b::State<MyStates>>,
+    mut next_state: b::ResMut<b::NextState<MyStates>>,
+) {
+    next_state.set_if_neq(match *state.get() {
+        MyStates::AssetLoading => return,
+        MyStates::Playing => MyStates::Paused,
+        MyStates::Paused => MyStates::Playing,
+    });
 }
 
 // -------------------------------------------------------------------------------------------------
