@@ -86,7 +86,7 @@ pub(crate) fn shoot(
         b::PlaybackSettings {
             spatial: true,
             volume: bevy::audio::Volume::Decibels(-10.),
-            speed: rand::rng().random_range(0.5..=1.5),
+            speed: rand::rng().random_range(0.75..=1.25) + coherence.powi(2) * 2.0,
             ..b::PlaybackSettings::DESPAWN
         },
         origin_of_bullets_transform,

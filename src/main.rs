@@ -290,7 +290,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
         Gun { cooldown: 0.0 },
     ));
 
-    commands.spawn((Coherence, Quantity { value: 0.5 }));
+    commands.spawn((Coherence, Quantity { value: 1.0 }));
     commands.spawn((Fever, Quantity { value: 0.5 }));
     commands.spawn((Fervor, Quantity { value: 0.0 }));
 }
