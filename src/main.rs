@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 use avian2d::prelude as p;
 use bevy::app::PluginGroup as _;
 use bevy::camera::visibility::RenderLayers;
+use bevy::color::Alpha as _;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2};
 use bevy::prelude as b;
@@ -112,6 +113,9 @@ struct Gun {
 #[derive(Debug, b::Component)]
 struct Lifetime(f32);
 
+// -------------------------------------------------------------------------------------------------
+// Quantities
+
 /// A value between 0 and 1 that is displayed to the player as a bar.
 /// Other components on this entity define which quantity it is and how systems affect it.
 #[derive(Debug, b::Component)]
@@ -130,6 +134,9 @@ struct Fever;
 /// [`Quantity`] 3/3; maxing it is a win.
 #[derive(Debug, b::Component)]
 struct Fervor;
+
+#[derive(Debug, b::Component)]
+struct UpdateTextFrom(b::Entity);
 
 // -------------------------------------------------------------------------------------------------
 // Rendering-related components
@@ -240,6 +247,34 @@ fn setup_ui(mut commands: b::Commands, asset_server: b::Res<b::AssetServer>) {
         b::Sprite::from_image(asset_server.load("playfield-frame.png")),
         b::Transform::from_xyz(0., 0., Zees::Frame.z()),
     ));
+
+    commands.spawn(bar_bundle(
+        "Coherence",
+        vec2(PLAYFIELD_RECT.min.x - 20.0, PLAYFIELD_RECT.min.y),
+    ));
+    commands.spawn(bar_bundle(
+        "Fever",
+        vec2(PLAYFIELD_RECT.min.x - 60.0, PLAYFIELD_RECT.min.y),
+    ));
+    commands.spawn(bar_bundle(
+        "Fervor",
+        vec2(PLAYFIELD_RECT.min.x - 100.0, PLAYFIELD_RECT.min.y),
+    ));
+}
+
+/// Build the UI for a [`Quantity`] bar
+fn bar_bundle(label: &str, position: Vec2) -> impl b::Bundle {
+    (
+        b::Text2d::new(label),
+        b::TextLayout::new_with_justify(b::Justify::Left),
+        bevy::sprite::Anchor::CENTER_LEFT,
+        b::Transform {
+            translation: position.extend(0.0),
+            rotation: b::Quat::from_rotation_z(PI / 2.),
+            ..default()
+        }, //b::TextBackgroundColor(b::Color::BLACK.with_alpha(0.5)),
+           // Text2dShadow::default(),
+    )
 }
 
 /// Spawn the entities that participate in gameplay rules.
