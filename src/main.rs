@@ -3,7 +3,6 @@ use std::f32::consts::PI;
 use avian2d::prelude as p;
 use bevy::app::PluginGroup as _;
 use bevy::camera::visibility::RenderLayers;
-use bevy::ecs::entity::EntityHashSet;
 use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2, vec3};
@@ -14,7 +13,11 @@ use bevy::render::render_resource::{
 use bevy::utils::default;
 use bevy_enhanced_input::prelude as bei;
 use bevy_enhanced_input::prelude::InputContextAppExt as _;
-use rand::RngExt;
+
+// -------------------------------------------------------------------------------------------------
+
+mod bullets_and_targets;
+use bullets_and_targets::{Attackable, Gun, PlayerBullet};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -59,7 +62,7 @@ fn main() {
         .add_systems(
             b::FixedUpdate,
             // put these in *some* order for consistency
-            (expire_lifetimes, bullet_hit_system).chain(),
+            (expire_lifetimes, bullets_and_targets::bullet_hit_system).chain(),
         )
         .add_systems(
             b::FixedUpdate,
@@ -72,8 +75,8 @@ fn main() {
             )
                 .chain(),
         )
-        .add_systems(b::FixedUpdate, gun_cooldown)
-        .add_observer(shoot)
+        .add_systems(b::FixedUpdate, bullets_and_targets::gun_cooldown)
+        .add_observer(bullets_and_targets::shoot)
         .run();
 }
 
@@ -117,21 +120,6 @@ impl Zees {
 #[derive(Debug, b::Component)]
 #[require(b::Transform)]
 struct Player;
-
-#[derive(Debug, b::Component)]
-struct PlayerBullet;
-
-/// Something that dies if shot.
-#[derive(Debug, b::Component)]
-struct Attackable {
-    health: u8,
-}
-
-#[derive(Debug, b::Component)]
-struct Gun {
-    /// If positive, gun may not shoot.
-    cooldown: f32,
-}
 
 /// Decremented by game time and despawns the entity when it is zero
 #[derive(Debug, b::Component)]
@@ -432,70 +420,6 @@ fn apply_movement(
     Ok(())
 }
 
-fn shoot(
-    _shoot: b::On<bei::Fire<Shoot>>,
-    mut commands: b::Commands,
-    gun_query: b::Query<(&b::Transform, &mut Gun), b::With<Player>>,
-    coherence_query: b::Single<&Quantity, (b::With<Coherence>, b::Without<Fever>)>,
-    mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
-    asset_server: b::Res<b::AssetServer>,
-) -> b::Result {
-    let (player_transform, mut gun) = gun_query.single_inner()?;
-
-    if gun.cooldown != 0.0 {
-        return Ok(());
-    }
-
-    let mut origin_of_bullets_transform: b::Transform = *player_transform;
-    origin_of_bullets_transform.translation.z = Zees::Bullets.z();
-
-    let coherence = coherence_query.value;
-
-    let bullet_scale = vec2(1.0, 1.0 + coherence.powi(2) * 10.0);
-    let base_bullet_speed = 400.0 + coherence.powi(2) * 10.0;
-    let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
-
-    for bullet_angle_index in -3..=3 {
-        let bullet_angle_rad = bullet_angle_index as f32 * bullet_angle_step_rad;
-
-        let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
-        commands.spawn((
-            PlayerBullet,
-            Lifetime(0.4),
-            b::Sprite::from_image(asset_server.load("player-bullet.png")),
-            PLAYFIELD_LAYERS,
-            p::RigidBody::Kinematic,
-            p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
-            // constants are sprite size
-            p::Collider::rectangle(4. * bullet_scale.x, 8. * bullet_scale.y),
-            p::CollidingEntities::default(), // for dealing damage
-            origin_of_bullets_transform
-                * b::Transform {
-                    rotation: b::Quat::from_rotation_z(bullet_angle_rad),
-                    scale: bullet_scale.extend(1.0),
-                    ..default()
-                },
-        ));
-    }
-
-    commands.spawn((
-        b::AudioPlayer::new(asset_server.load("fire.ogg")),
-        b::PlaybackSettings {
-            spatial: true,
-            volume: bevy::audio::Volume::Decibels(-10.),
-            speed: rand::rng().random_range(0.5..=1.5),
-            ..b::PlaybackSettings::DESPAWN
-        },
-        origin_of_bullets_transform,
-    ));
-
-    // Side effects of firing besides a bullet.
-    gun.cooldown = 0.25;
-    fever_query.value = (fever_query.value + 0.1 * coherence).clamp(0.0, 1.0);
-
-    Ok(())
-}
-
 // -------------------------------------------------------------------------------------------------
 
 fn expire_lifetimes(
@@ -521,50 +445,6 @@ fn expire_lifetimes(
             }
         }
     }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
-    let delta = time.delta_secs();
-    for mut gun in query {
-        let new_cooldown = (gun.cooldown - delta).max(0.0);
-        if new_cooldown != gun.cooldown {
-            gun.cooldown = new_cooldown;
-        }
-    }
-}
-
-fn bullet_hit_system(
-    mut commands: b::Commands,
-    bullet_query: b::Query<(b::Entity, &p::CollidingEntities), b::With<PlayerBullet>>,
-    mut target_query: b::Query<&mut Attackable>,
-) -> b::Result {
-    let mut killed = EntityHashSet::new();
-    'bullet: for (bullet_entity, collisions) in bullet_query {
-        'colliding: for &colliding_entity in &collisions.0 {
-            if killed.contains(&colliding_entity) {
-                // already killed but not yet despawned; skip
-                continue 'colliding;
-            }
-            let Ok(mut attackable) = target_query.get_mut(colliding_entity) else {
-                // collided but is not attackable
-                continue 'colliding;
-            };
-
-            let new_health = attackable.health.saturating_sub(1);
-
-            if new_health == 0 {
-                commands.entity(colliding_entity).despawn();
-                killed.insert(colliding_entity);
-            } else {
-                attackable.health = new_health;
-            }
-            commands.entity(bullet_entity).despawn();
-            continue 'bullet; // each bullet hits only one entity
-        }
-    }
-    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------
