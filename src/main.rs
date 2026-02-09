@@ -56,7 +56,7 @@ fn main() {
         .add_systems(b::Update, fit_canvas_to_window)
         .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(b::FixedUpdate, expire_lifetimes)
-        .add_systems(b::FixedUpdate, gun_cooldown)
+        .add_systems(b::FixedUpdate, (gun_cooldown, bullet_hit_system))
         .add_systems(
             b::FixedUpdate,
             (
@@ -454,6 +454,7 @@ fn shoot(
             p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
             // constants are sprite size
             p::Collider::rectangle(4. * bullet_scale.x, 8. * bullet_scale.y),
+            p::CollidingEntities::default(), // for dealing damage
             origin_of_bullets_transform
                 * b::Transform {
                     rotation: b::Quat::from_rotation_z(bullet_angle_rad),
@@ -509,6 +510,31 @@ fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
             gun.cooldown = new_cooldown;
         }
     }
+}
+
+fn bullet_hit_system(
+    mut commands: b::Commands,
+    bullet_query: b::Query<(b::Entity, &p::CollidingEntities), b::With<PlayerBullet>>,
+    mut target_query: b::Query<&mut Attackable>,
+) -> b::Result {
+    'bullet: for (bullet_entity, collisions) in bullet_query {
+        'colliding: for &colliding_entity in &collisions.0 {
+            let Ok(mut attackable) = target_query.get_mut(colliding_entity) else {
+                continue 'colliding;
+            };
+
+            let new_health = attackable.health.saturating_sub(1);
+
+            if new_health == 0 {
+                commands.entity(colliding_entity).despawn();
+            } else {
+                attackable.health = new_health;
+            }
+            commands.entity(bullet_entity).despawn();
+            continue 'bullet; // each bullet hits only one entity
+        }
+    }
+    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------
