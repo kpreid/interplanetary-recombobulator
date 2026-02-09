@@ -51,7 +51,6 @@ fn main() {
         .add_input_context::<Player>()
         .add_plugins(avian2d::PhysicsPlugins::default())
         .add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
-        //.add_plugins(player::player_plugin)
         .add_systems(b::Startup, (setup_camera, setup_gameplay))
         .add_systems(b::Update, fit_canvas_to_window)
         .add_systems(b::FixedUpdate, apply_movement)
