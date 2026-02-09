@@ -4,6 +4,7 @@ use avian2d::prelude as p;
 use bevy::app::PluginGroup as _;
 use bevy::camera::visibility::RenderLayers;
 use bevy::color::Alpha as _;
+use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2, vec3};
 use bevy::prelude as b;
@@ -52,12 +53,22 @@ fn main() {
         .add_input_context::<Player>()
         .add_plugins(avian2d::PhysicsPlugins::default())
         //.add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
-        .add_systems(b::Startup, (setup_camera, setup_gameplay, setup_ui))
+        .add_systems(b::Startup, (setup_camera, setup_gameplay, setup_ui).chain())
         .add_systems(b::Update, fit_canvas_to_window)
         .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(b::FixedUpdate, expire_lifetimes)
         .add_systems(b::FixedUpdate, gun_cooldown)
-        .add_systems(b::FixedUpdate, quantity_behaviors)
+        .add_systems(
+            b::FixedUpdate,
+            (
+                quantity_behaviors,
+                (
+                    update_quantity_display_system_1,
+                    update_quantity_display_system_2,
+                ),
+            )
+                .chain(),
+        )
         .add_observer(shoot)
         .run();
 }
@@ -85,7 +96,7 @@ const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(1);
 enum Zees {
     Bullets = -1,
     Player = 0,
-    Frame = 1,
+    UiElement = 1,
 }
 impl Zees {
     fn z(self) -> f32 {
@@ -135,8 +146,9 @@ struct Fever;
 #[derive(Debug, b::Component)]
 struct Fervor;
 
+/// Specifies a [`Quantity`] this entity should update its visual appearance (e.g. bar length) from.
 #[derive(Debug, b::Component)]
-struct UpdateTextFrom(b::Entity);
+struct UpdateFromQuantity(b::Entity);
 
 // -------------------------------------------------------------------------------------------------
 // Rendering-related components
@@ -242,38 +254,66 @@ fn fit_canvas_to_window(
     Ok(())
 }
 
-fn setup_ui(mut commands: b::Commands, asset_server: b::Res<b::AssetServer>) {
+fn setup_ui(
+    mut commands: b::Commands,
+    asset_server: b::Res<b::AssetServer>,
+    coherence: b::Single<b::Entity, (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>)>,
+    fever: b::Single<b::Entity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
+    fervor: b::Single<b::Entity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
+) {
     commands.spawn((
         b::Sprite::from_image(asset_server.load("playfield-frame.png")),
-        b::Transform::from_xyz(0., 0., Zees::Frame.z()),
+        b::Transform::from_xyz(0., 0., Zees::UiElement.z()),
     ));
 
+    let bar_fill_image = asset_server.load("bar-fill.png");
+
     commands.spawn(bar_bundle(
+        &bar_fill_image,
         "Coherence",
+        *coherence,
         vec2(PLAYFIELD_RECT.min.x - 20.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
+        &bar_fill_image,
         "Fever",
+        *fever,
         vec2(PLAYFIELD_RECT.min.x - 60.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
+        &bar_fill_image,
         "Fervor",
+        *fervor,
         vec2(PLAYFIELD_RECT.min.x - 100.0, PLAYFIELD_RECT.min.y),
     ));
 }
 
 /// Build the UI for a [`Quantity`] bar
-fn bar_bundle(label: &str, position: Vec2) -> impl b::Bundle {
+fn bar_bundle(
+    bar_fill_image: &b::Handle<b::Image>,
+    label: &str,
+    quantity_entity: b::Entity,
+    position: Vec2,
+) -> impl b::Bundle {
     (
-        b::Text2d::new(label),
-        b::TextLayout::new_with_justify(b::Justify::Left),
-        bevy::sprite::Anchor::CENTER_LEFT,
+        b::children![
+            (
+                b::Sprite::from_image(bar_fill_image.clone()),
+                bevy::sprite::Anchor::CENTER_LEFT,
+                UpdateFromQuantity(quantity_entity),
+            ),
+            (
+                b::Text2d::new(label),
+                b::TextLayout::new_with_justify(b::Justify::Left),
+                bevy::sprite::Anchor::CENTER_LEFT,
+                b::Transform::from_translation(vec3(0.0, 20.0, 0.0))
+            )
+        ],
         b::Transform {
-            translation: position.extend(0.0),
+            translation: position.extend(Zees::UiElement.z()),
             rotation: b::Quat::from_rotation_z(PI / 2.),
             ..default()
-        }, //b::TextBackgroundColor(b::Color::BLACK.with_alpha(0.5)),
-           // Text2dShadow::default(),
+        },
     )
 }
 
@@ -430,6 +470,14 @@ fn quantity_behaviors(
     >,
     fever: b::Single<&mut Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
+) -> b::Result {
+    Ok(())
+}
+
+fn update_quantity_display_system_1(
+    //coherence: b::Single<&Quantity, b::With<Coherence>>,
+    fever: b::Single<&Quantity, b::With<Fever>>,
+    //fervor: b::Single<&Quantity, b::With<Fervor>>,
     mut pixel_camera: b::Single<&mut b::Camera, b::With<InGameCamera>>,
 ) -> b::Result {
     pixel_camera.clear_color = bevy::camera::ClearColorConfig::Custom(b::Color::oklch(
@@ -437,5 +485,16 @@ fn quantity_behaviors(
         fever.value,
         0.0,
     ));
+    Ok(())
+}
+
+fn update_quantity_display_system_2(
+    quantities: b::Query<&Quantity>,
+    bars_to_update: b::Query<(&mut b::Transform, &UpdateFromQuantity)>,
+) -> b::Result {
+    for (mut bar_transform, ufq) in bars_to_update {
+        let quantity = quantities.get(ufq.0)?.value;
+        bar_transform.scale = vec3(10.0 * quantity, 1.0, 1.0);
+    }
     Ok(())
 }
