@@ -7,7 +7,7 @@ edition = "2024"
 # TODO: trim unused features
 avian2d = "0.5.0"
 # TODO: remove dynamic_linking for release build
-bevy = { version = "0.18.0", features = ["dynamic_linking"] }
+bevy = { version = "0.18.0", features = ["debug", "dynamic_linking"] }
 bevy_enhanced_input = "0.23.2"
 exhaust = "0.2.2"
 itertools = "0.14.0"

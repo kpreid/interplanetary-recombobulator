@@ -3,7 +3,6 @@ use std::f32::consts::PI;
 use avian2d::prelude as p;
 use bevy::app::PluginGroup as _;
 use bevy::camera::visibility::RenderLayers;
-use bevy::color::Alpha as _;
 use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2, vec3};
@@ -340,6 +339,7 @@ fn bar_bundle(
                 UI_LAYERS,
             )
         ],
+        b::Visibility::default(), // needed for hierarchy https://bevy.org/learn/errors/b0004/
         b::Transform {
             translation: position.extend(Zees::UiElement.z()),
             rotation: b::Quat::from_rotation_z(PI / 2.),
