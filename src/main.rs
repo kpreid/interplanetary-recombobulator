@@ -18,7 +18,10 @@ mod bullets_and_targets;
 use bullets_and_targets::{Attackable, Gun, PlayerBullet};
 
 mod rendering;
-use crate::rendering::{PLAYFIELD_LAYERS, PlayfieldCamera, SCALING_MARGIN, UI_LAYERS, Zees};
+use crate::quantity::{Coherence, Fervor, Fever, Quantity};
+use crate::rendering::{PLAYFIELD_LAYERS, SCALING_MARGIN, UI_LAYERS, Zees};
+
+mod quantity;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -71,10 +74,10 @@ fn main() {
         .add_systems(
             b::FixedUpdate,
             (
-                quantity_behaviors,
+                quantity::quantity_behaviors_system,
                 (
-                    update_quantity_display_system_1,
-                    update_quantity_display_system_2,
+                    quantity::update_quantity_display_system_1,
+                    quantity::update_quantity_display_system_2,
                 ),
             )
                 .chain(),
@@ -108,32 +111,6 @@ struct Player;
 /// Decremented by game time and despawns the entity when it is zero
 #[derive(Debug, b::Component)]
 struct Lifetime(f32);
-
-// -------------------------------------------------------------------------------------------------
-// Quantities
-
-/// A value between 0 and 1 that is displayed to the player as a bar.
-/// Other components on this entity define which quantity it is and how systems affect it.
-#[derive(Debug, b::Component)]
-struct Quantity {
-    value: f32,
-}
-
-/// [`Quantity`] 1/3; affects shooting.
-#[derive(Debug, b::Component)]
-struct Coherence;
-
-/// [`Quantity`] 2/3; maxing it is game over.
-#[derive(Debug, b::Component)]
-struct Fever;
-
-/// [`Quantity`] 3/3; maxing it is a win.
-#[derive(Debug, b::Component)]
-struct Fervor;
-
-/// Specifies a [`Quantity`] this entity should update its visual appearance (e.g. bar length) from.
-#[derive(Debug, b::Component)]
-struct UpdateFromQuantity(b::Entity);
 
 // -------------------------------------------------------------------------------------------------
 
@@ -194,7 +171,7 @@ fn bar_bundle(
             (
                 b::Sprite::from_image(bar_fill_image.clone()),
                 bevy::sprite::Anchor::CENTER_LEFT,
-                UpdateFromQuantity(quantity_entity),
+                quantity::UpdateFromQuantity(quantity_entity),
                 UI_LAYERS,
             ),
             (
@@ -303,44 +280,4 @@ fn expire_lifetimes(
             }
         }
     }
-}
-
-// -------------------------------------------------------------------------------------------------
-
-#[expect(unused_variables)]
-fn quantity_behaviors(
-    coherence: b::Single<
-        &mut Quantity,
-        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
-    >,
-    fever: b::Single<&mut Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
-    fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
-) -> b::Result {
-    Ok(())
-}
-
-fn update_quantity_display_system_1(
-    //coherence: b::Single<&Quantity, b::With<Coherence>>,
-    fever: b::Single<&Quantity, b::With<Fever>>,
-    //fervor: b::Single<&Quantity, b::With<Fervor>>,
-    mut pixel_camera: b::Single<&mut b::Camera, b::With<PlayfieldCamera>>,
-) -> b::Result {
-    pixel_camera.clear_color = bevy::camera::ClearColorConfig::Custom(b::Color::oklch(
-        fever.value * 0.05,
-        fever.value,
-        0.0,
-    ));
-    Ok(())
-}
-
-fn update_quantity_display_system_2(
-    quantities: b::Query<&Quantity>,
-    bars_to_update: b::Query<(&mut b::Transform, &UpdateFromQuantity)>,
-) -> b::Result {
-    for (mut bar_transform, ufq) in bars_to_update {
-        let quantity = quantities.get(ufq.0)?.value;
-        // TODO: establish a constant for bar height instead
-        bar_transform.scale = vec3((SCREEN_SIZE.y as f32 - 20.0) / 16.0 * quantity, 1.0, 1.0);
-    }
-    Ok(())
 }
