@@ -114,6 +114,12 @@ struct Player;
 #[derive(Debug, b::Component)]
 struct PlayerBullet;
 
+/// Something that dies if shot.
+#[derive(Debug, b::Component)]
+struct Attackable {
+    health: u8,
+}
+
 #[derive(Debug, b::Component)]
 struct Gun {
     /// If positive, gun may not shoot.
@@ -379,6 +385,19 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
     commands.spawn((Coherence, Quantity { value: 0.5 }));
     commands.spawn((Fever, Quantity { value: 0.5 }));
     commands.spawn((Fervor, Quantity { value: 0.0 }));
+
+    for x in (-100..100).step_by(32) {
+        for y in [100, 120, 240] {
+            commands.spawn((
+                Attackable { health: 10 },
+                b::Transform::from_xyz(x as f32, y as f32, 0.0),
+                b::Sprite::from_image(player_sprite_asset.clone()), // TODO: enemy sprite
+                PLAYFIELD_LAYERS,
+                p::Collider::circle(8.),
+                Gun { cooldown: 0.0 },
+            ));
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -402,7 +421,7 @@ fn apply_movement(
 fn shoot(
     _shoot: b::On<bei::Fire<Shoot>>,
     mut commands: b::Commands,
-    gun_query: b::Query<(&b::Transform, &mut Gun)>,
+    gun_query: b::Query<(&b::Transform, &mut Gun), b::With<Player>>,
     coherence_query: b::Single<&Quantity, (b::With<Coherence>, b::Without<Fever>)>,
     mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
     asset_server: b::Res<b::AssetServer>,
