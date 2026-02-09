@@ -332,7 +332,8 @@ fn shoot(
     _shoot: b::On<bei::Fire<Shoot>>,
     mut commands: b::Commands,
     gun_query: b::Query<(&b::Transform, &mut Gun)>,
-    coherence_query: b::Single<&Quantity, b::With<Coherence>>,
+    coherence_query: b::Single<&Quantity, (b::With<Coherence>, b::Without<Fever>)>,
+    mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
     asset_server: b::Res<b::AssetServer>,
 ) -> b::Result {
     let (player_transform, mut gun) = gun_query.single_inner()?;
@@ -351,7 +352,7 @@ fn shoot(
     let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
 
     for bullet_angle_index in -3..=3 {
-        let bullet_angle_rad = (bullet_angle_index as f32 * bullet_angle_step_rad);
+        let bullet_angle_rad = bullet_angle_index as f32 * bullet_angle_step_rad;
 
         let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
         commands.spawn((
@@ -371,6 +372,7 @@ fn shoot(
                 },
         ));
     }
+
     commands.spawn((
         b::AudioPlayer::new(asset_server.load("fire.ogg")),
         b::PlaybackSettings {
@@ -382,7 +384,9 @@ fn shoot(
         origin_of_bullets_transform,
     ));
 
+    // Side effects of firing besides a bullet.
     gun.cooldown = 0.25;
+    fever_query.value += 0.1 * coherence;
 
     Ok(())
 }
@@ -428,7 +432,10 @@ fn quantity_behaviors(
     fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
     mut pixel_camera: b::Single<&mut b::Camera, b::With<InGameCamera>>,
 ) -> b::Result {
-    pixel_camera.clear_color =
-        bevy::camera::ClearColorConfig::Custom(b::Color::oklch(fever.value * 0.05, fever.value, 0.0));
+    pixel_camera.clear_color = bevy::camera::ClearColorConfig::Custom(b::Color::oklch(
+        fever.value * 0.05,
+        fever.value,
+        0.0,
+    ));
     Ok(())
 }
