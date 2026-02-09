@@ -179,6 +179,13 @@ fn setup_camera(
 
     commands.spawn((b::Sprite::from_image(image_handle), Canvas, HIGH_RES_LAYERS));
     commands.spawn((b::Camera2d, b::Msaa::Off, OuterCamera, HIGH_RES_LAYERS));
+
+    // Spatial audio listener (*not* attached to the player ship)
+    commands.spawn((
+        b::SpatialListener::new(2.0),
+        // for some reason it seems we need to reverse left-right
+        b::Transform::from_rotation(b::Quat::from_rotation_y(PI)),
+    ));
 }
 
 /// Scales camera projection to fit the window (integer multiples only).
@@ -225,13 +232,6 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
             )
         ]),
         Gun { cooldown: 0.0 },
-    ));
-
-    // Spatial audio listener (*not* attached to the player ship)
-    commands.spawn((
-        b::SpatialListener::new(2.0),
-        // for some reason it seems we need to reverse left-right
-        b::Transform::from_rotation(b::Quat::from_rotation_y(PI)),
     ));
 }
 
