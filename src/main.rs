@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 use avian2d::prelude as p;
 use bevy::app::PluginGroup as _;
 use bevy::camera::visibility::RenderLayers;
+use bevy::ecs::entity::EntityHashSet;
 use bevy::ecs::schedule::IntoScheduleConfigs as _;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2, vec3};
@@ -55,8 +56,11 @@ fn main() {
         .add_systems(b::Startup, (setup_camera, setup_gameplay, setup_ui).chain())
         .add_systems(b::Update, fit_canvas_to_window)
         .add_systems(b::FixedUpdate, apply_movement)
-        .add_systems(b::FixedUpdate, expire_lifetimes)
-        .add_systems(b::FixedUpdate, (gun_cooldown, bullet_hit_system))
+        .add_systems(
+            b::FixedUpdate,
+            // put these in *some* order for consistency
+            (expire_lifetimes, bullet_hit_system).chain(),
+        )
         .add_systems(
             b::FixedUpdate,
             (
@@ -68,6 +72,7 @@ fn main() {
             )
                 .chain(),
         )
+        .add_systems(b::FixedUpdate, gun_cooldown)
         .add_observer(shoot)
         .run();
 }
@@ -438,7 +443,7 @@ fn shoot(
     let coherence = coherence_query.value;
 
     let bullet_scale = vec2(1.0, 1.0 + coherence.powi(2) * 10.0);
-    let base_bullet_speed = 800.0 + coherence.powi(2) * 10.0;
+    let base_bullet_speed = 400.0 + coherence.powi(2) * 10.0;
     let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
 
     for bullet_angle_index in -3..=3 {
@@ -502,7 +507,9 @@ fn expire_lifetimes(
             commands.entity(entity).despawn();
 
             // If this is a bullet, then if it expired, it is a miss; lose coherence.
-            coherence.value = (coherence.value - 0.01).clamp(0.0, 1.0);
+            if is_bullet {
+                coherence.value = (coherence.value - 0.01).clamp(0.0, 1.0);
+            }
         }
     }
 }
@@ -524,9 +531,15 @@ fn bullet_hit_system(
     bullet_query: b::Query<(b::Entity, &p::CollidingEntities), b::With<PlayerBullet>>,
     mut target_query: b::Query<&mut Attackable>,
 ) -> b::Result {
+    let mut killed = EntityHashSet::new();
     'bullet: for (bullet_entity, collisions) in bullet_query {
         'colliding: for &colliding_entity in &collisions.0 {
+            if killed.contains(&colliding_entity) {
+                // already killed but not yet despawned; skip
+                continue 'colliding;
+            }
             let Ok(mut attackable) = target_query.get_mut(colliding_entity) else {
+                // collided but is not attackable
                 continue 'colliding;
             };
 
@@ -534,6 +547,7 @@ fn bullet_hit_system(
 
             if new_health == 0 {
                 commands.entity(colliding_entity).despawn();
+                killed.insert(colliding_entity);
             } else {
                 attackable.health = new_health;
             }
