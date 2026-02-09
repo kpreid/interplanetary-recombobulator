@@ -220,7 +220,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
     let player_sprite_asset = asset_server.load("player.png");
     commands.spawn((
         Player,
-        b::Transform::from_xyz(0., 0., Zees::Player.z()),
+        b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, Zees::Player.z()),
         b::Sprite::from_image(player_sprite_asset.clone()),
         PIXEL_LAYERS,
         bei::actions!(Player[
