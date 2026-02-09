@@ -426,6 +426,9 @@ fn quantity_behaviors(
     >,
     fever: b::Single<&mut Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
+    mut pixel_camera: b::Single<&mut b::Camera, b::With<InGameCamera>>,
 ) -> b::Result {
+    pixel_camera.clear_color =
+        bevy::camera::ClearColorConfig::Custom(b::Color::oklch(fever.value * 0.05, fever.value, 0.0));
     Ok(())
 }
