@@ -494,7 +494,8 @@ fn update_quantity_display_system_2(
 ) -> b::Result {
     for (mut bar_transform, ufq) in bars_to_update {
         let quantity = quantities.get(ufq.0)?.value;
-        bar_transform.scale = vec3(10.0 * quantity, 1.0, 1.0);
+        // TODO: establish a constant for bar height instead
+        bar_transform.scale = vec3((SCREEN_SIZE.y as f32 - 20.0) / 16.0 * quantity, 1.0, 1.0);
     }
     Ok(())
 }
