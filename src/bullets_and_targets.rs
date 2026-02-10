@@ -27,90 +27,112 @@ pub(crate) struct Attackable {
 /// This entity has a gun! It might be the player ship or an enemy ship.
 #[derive(Debug, b::Component)]
 pub(crate) struct Gun {
+    /// Gun will shoot next time [`fire_gun_system`] runs, if possible.
+    pub trigger: bool,
+
     /// If positive, gun may not shoot yet.
     pub cooldown: f32,
 }
 
 // -------------------------------------------------------------------------------------------------
 
-/// Shoot the gun if the button is pressed.
 /// Note that this is an input observer, not a system function
-pub(crate) fn shoot(
+pub(crate) fn player_input_fire_gun(
     _shoot: b::On<bei::Fire<Shoot>>,
+    gun_query: b::Query<&mut Gun, b::With<Player>>,
+) {
+    // fire button can be pressed this many seconds in advance
+    const EARLY_TRIGGER_WINDOW: f32 = 0.05;
+
+    for mut gun in gun_query {
+        if gun.cooldown <= EARLY_TRIGGER_WINDOW {
+            gun.trigger = true;
+        } else {
+            // ignore fire button when gun is not close enough to ready to fire
+        }
+    }
+}
+
+/// Spawn bullets if [`Gun::trigger`] is true.
+pub(crate) fn fire_gun_system(
     mut commands: b::Commands,
-    gun_query: b::Query<(&b::Transform, &mut Gun), b::With<Player>>,
+    gun_query: b::Query<(&b::Transform, &mut Gun, b::Has<Player>)>,
     coherence_query: b::Single<&Quantity, (b::With<Coherence>, b::Without<Fever>)>,
     mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
     assets: b::Res<crate::Preload>,
     images: b::Res<b::Assets<b::Image>>,
 ) -> b::Result {
-    let (player_transform, mut gun) = gun_query.single_inner()?;
+    for (gun_transform, mut gun, is_player) in gun_query {
+        if !gun.trigger || gun.cooldown != 0.0 {
+            // Gun is not commanded to fire or is not ready to fire
+            continue;
+        }
+        gun.trigger = false;
 
-    if gun.cooldown != 0.0 {
-        return Ok(());
-    }
+        let mut origin_of_bullets_transform: b::Transform = *gun_transform;
+        origin_of_bullets_transform.translation.z = Zees::Bullets.z();
 
-    let mut origin_of_bullets_transform: b::Transform = *player_transform;
-    origin_of_bullets_transform.translation.z = Zees::Bullets.z();
+        let coherence = coherence_query.value;
 
-    let coherence = coherence_query.value;
+        let base_bullet_speed = 400.0 + coherence.powi(2) * 20000.0;
+        let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
+        // bullets scaled so that they overlap themselves from frame to frame,
+        // for both reliable collisions and for good visuals.
+        let bullet_scale = vec2(1.0, (base_bullet_speed * 0.003).max(1.0));
 
-    let base_bullet_speed = 400.0 + coherence.powi(2) * 20000.0;
-    let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
-    // bullets scaled so that they overlap themselves from frame to frame,
-    // for both reliable collisions and for good visuals.
-    let bullet_scale = vec2(1.0, (base_bullet_speed * 0.003).max(1.0));
+        let sprite_size = images
+            .get(&assets.player_bullet_sprite)
+            .ok_or_else(|| b::BevyError::from("asset not loaded"))?
+            .size_f32();
+        let bullet_box_size = sprite_size * bullet_scale;
 
-    let sprite_size = images
-        .get(&assets.player_bullet_sprite)
-        .ok_or_else(|| b::BevyError::from("asset not loaded"))?
-        .size_f32();
-    let bullet_box_size = sprite_size * bullet_scale;
+        for bullet_angle_index in -3..=3 {
+            let bullet_angle_rad = bullet_angle_index as f32 * bullet_angle_step_rad;
+            let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
+            let bullet_transform = origin_of_bullets_transform
+                * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
+                * b::Transform::from_translation(vec3(0.0, bullet_box_size.y / 2., 0.0))
+                * b::Transform::from_scale(bullet_scale.extend(1.0));
 
-    for bullet_angle_index in -3..=3 {
-        let bullet_angle_rad = bullet_angle_index as f32 * bullet_angle_step_rad;
-        let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
-        let bullet_transform = origin_of_bullets_transform
-            * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
-            * b::Transform::from_translation(vec3(0.0, bullet_box_size.y / 2., 0.0))
-            * b::Transform::from_scale(bullet_scale.extend(1.0));
+            commands.spawn((
+                PlayerBullet,
+                Lifetime(0.4),
+                b::Sprite::from_image(assets.player_bullet_sprite.clone()),
+                PLAYFIELD_LAYERS,
+                p::RigidBody::Kinematic,
+                p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
+                p::Collider::ellipse(sprite_size.x / 2., sprite_size.y / 2.),
+                p::CollidingEntities::default(), // for dealing damage
+                bullet_transform,
+            ));
+
+            // Muzzle flash sprite is transformed exactly like the bullet, but does not move forward.
+            // This helps avoid fast bullets look disconnected.
+            commands.spawn((
+                Lifetime(0.04),
+                b::Sprite::from_image(assets.muzzle_flash_sprite.clone()),
+                PLAYFIELD_LAYERS,
+                bullet_transform,
+            ));
+        }
 
         commands.spawn((
-            PlayerBullet,
-            Lifetime(0.4),
-            b::Sprite::from_image(assets.player_bullet_sprite.clone()),
-            PLAYFIELD_LAYERS,
-            p::RigidBody::Kinematic,
-            p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
-            p::Collider::ellipse(sprite_size.x / 2., sprite_size.y / 2.),
-            p::CollidingEntities::default(), // for dealing damage
-            bullet_transform,
+            b::AudioPlayer::new(assets.shoot_sound.clone()),
+            b::PlaybackSettings {
+                spatial: true,
+                volume: bevy::audio::Volume::Decibels(-10.),
+                speed: rand::rng().random_range(0.75..=1.25) + coherence.powi(2) * 2.0,
+                ..b::PlaybackSettings::DESPAWN
+            },
+            origin_of_bullets_transform,
         ));
 
-        // Muzzle flash sprite is transformed exactly like the bullet, but does not move forward.
-        // This helps avoid fast bullets look disconnected.
-        commands.spawn((
-            Lifetime(0.04),
-            b::Sprite::from_image(assets.muzzle_flash_sprite.clone()),
-            PLAYFIELD_LAYERS,
-            bullet_transform,
-        ));
+        // Side effects of firing besides a bullet.
+        gun.cooldown = 0.25;
+        if is_player {
+            fever_query.adjust(0.1 * coherence);
+        }
     }
-
-    commands.spawn((
-        b::AudioPlayer::new(assets.shoot_sound.clone()),
-        b::PlaybackSettings {
-            spatial: true,
-            volume: bevy::audio::Volume::Decibels(-10.),
-            speed: rand::rng().random_range(0.75..=1.25) + coherence.powi(2) * 2.0,
-            ..b::PlaybackSettings::DESPAWN
-        },
-        origin_of_bullets_transform,
-    ));
-
-    // Side effects of firing besides a bullet.
-    gun.cooldown = 0.25;
-    fever_query.adjust(0.1 * coherence);
 
     Ok(())
 }

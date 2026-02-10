@@ -89,6 +89,7 @@ fn main() {
             (
                 expire_lifetimes,
                 pickup_system,
+                bullets_and_targets::fire_gun_system,
                 bullets_and_targets::bullet_hit_system,
             )
                 .chain()
@@ -114,7 +115,7 @@ fn main() {
             )
                 .run_if(b::in_state(MyStates::Playing)),
         )
-        .add_observer(bullets_and_targets::shoot)
+        .add_observer(bullets_and_targets::player_input_fire_gun)
         .run();
 }
 
@@ -320,7 +321,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
             )
         ]),
         p::Collider::circle(8.),
-        Gun { cooldown: 0.0 },
+        Gun { cooldown: 0.0, trigger: false, },
     ));
 
     commands.spawn((Coherence, Quantity { value: 1.0 }));
@@ -567,6 +568,6 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
         p::RigidBody::Kinematic,
         p::Collider::circle(8.),
         p::LinearVelocity(vec2(0.0, -40.0)),
-        Gun { cooldown: 0.0 },
+        Gun { cooldown: 0.0, trigger: false },
     )
 }
