@@ -35,11 +35,21 @@ pub(crate) struct Gun {
     /// Gun will shoot next time [`fire_gun_system`] runs, if possible.
     pub trigger: bool,
 
+    pub pattern: Pattern,
+
     /// If positive, gun may not shoot yet.
     pub cooldown: f32,
 
     /// Value `cooldown` is reset to after firing.
     pub base_cooldown: f32,
+}
+
+#[derive(Debug)]
+pub(crate) enum Pattern {
+    /// Fire a single, slow bullet.
+    Single,
+    /// Shotgun-to-laser depending on [`Coherence`].
+    Coherent,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -80,9 +90,15 @@ pub(crate) fn fire_gun_system(
         let mut origin_of_bullets_transform: b::Transform = *gun_transform;
         origin_of_bullets_transform.translation.z = Zees::Bullets.z();
 
-        let (coherence, base_shooting_angle): (f32, f32) = match team {
-            Team::Player => (coherence_query.value, 0.0),
-            Team::Enemy => (0.0, PI),
+        let base_shooting_angle = match team {
+            Team::Player => 0.0,
+            Team::Enemy => PI,
+        };
+
+        // 1 + 2 * spread_count is the number of bullets
+        let (coherence, spread_count): (f32, i32) = match gun.pattern {
+            Pattern::Single => (0.0, 0),
+            Pattern::Coherent => (coherence_query.value, 3),
         };
 
         let base_bullet_speed = 400.0 + coherence.powi(2) * 20000.0;
@@ -97,7 +113,7 @@ pub(crate) fn fire_gun_system(
             .size_f32();
         let bullet_box_size = sprite_size * bullet_scale;
 
-        for bullet_angle_index in -3..=3 {
+        for bullet_angle_index in -spread_count..=spread_count {
             let bullet_angle_rad =
                 base_shooting_angle + bullet_angle_index as f32 * bullet_angle_step_rad;
             let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;

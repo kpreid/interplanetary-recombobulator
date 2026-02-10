@@ -30,6 +30,8 @@ use rendering::{PLAYFIELD_LAYERS, SCALING_MARGIN, UI_LAYERS, Zees};
 mod quantity;
 use quantity::{Coherence, Fervor, Fever, Quantity};
 
+use crate::bullets_and_targets::Pattern;
+
 // -------------------------------------------------------------------------------------------------
 
 fn main() {
@@ -335,6 +337,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
             cooldown: 0.0,
             base_cooldown: 0.5,
             trigger: false,
+            pattern: Pattern::Coherent,
         },
     ));
 

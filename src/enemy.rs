@@ -2,6 +2,7 @@ use avian2d::prelude::{self as p};
 use bevy::math::{Vec2, vec2};
 use bevy::prelude as b;
 
+use crate::bullets_and_targets::Pattern;
 use crate::{
     Gun, Lifetime, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Pickup, Preload, Team, Zees,
     bullets_and_targets::Attackable,
@@ -90,6 +91,7 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
             cooldown: 0.0,
             base_cooldown: 2.0,
             trigger: false,
+            pattern: Pattern::Single,
         },
     )
 }
