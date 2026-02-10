@@ -161,7 +161,10 @@ pub(crate) fn fire_gun_system(
             b::AudioPlayer::new(assets.shoot_sound.clone()),
             b::PlaybackSettings {
                 spatial: true,
-                volume: bevy::audio::Volume::Decibels(-10.),
+                volume: match team {
+                    Team::Player => bevy::audio::Volume::Decibels(-10.),
+                    Team::Enemy => bevy::audio::Volume::Decibels(-30.),
+                },
                 speed: rand::rng().random_range(0.75..=1.25) + coherence.powi(2) * 2.0,
                 ..b::PlaybackSettings::DESPAWN
             },
