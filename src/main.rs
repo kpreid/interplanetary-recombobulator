@@ -303,6 +303,11 @@ fn setup_ui(
     commands.spawn((
         StatusText,
         b::Text2d::new(""),
+        bevy::text::TextBounds {
+            // if we don’t set this, the text wraps undesirably, maybe because it gets changed?
+            width: Some(PLAYFIELD_SIZE.x as f32),
+            height: None,
+        },
         b::TextLayout::new_with_justify(b::Justify::Center),
         bevy::sprite::Anchor::CENTER,
         b::Transform::from_translation(vec3(0.0, 20.0, 0.0)),
