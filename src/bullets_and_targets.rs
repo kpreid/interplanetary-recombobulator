@@ -113,12 +113,19 @@ pub(crate) fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
 
 pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
-    bullet_query: b::Query<(b::Entity, &p::CollidingEntities), b::With<PlayerBullet>>,
+    bullet_query: b::Query<
+        (b::Entity, &p::CollidingEntities, &mut Lifetime),
+        b::With<PlayerBullet>,
+    >,
     mut target_query: b::Query<(&mut Attackable, &b::Transform)>,
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
-    'bullet: for (bullet_entity, collisions) in bullet_query {
+    'bullet: for (bullet_entity, collisions, mut bullet_lifetime) in bullet_query {
+        if bullet_lifetime.0 == 0.0 {
+            // this bullet may have already hit something and is expiring
+            continue 'bullet;
+        }
         'colliding: for &colliding_entity in &collisions.0 {
             if killed.contains(&colliding_entity) {
                 // already killed but not yet despawned; skip
@@ -176,7 +183,8 @@ pub(crate) fn bullet_hit_system(
             ));
 
             // each bullet hits at most one entity and dies
-            commands.entity(bullet_entity).despawn();
+            //commands.entity(bullet_entity).despawn();
+            bullet_lifetime.0 = 0.0; // cause bullet to die on the next frame for visual purposes
             continue 'bullet; // don't hit anything else
         }
     }
