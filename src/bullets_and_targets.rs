@@ -5,13 +5,16 @@ use bevy::prelude as b;
 use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
 
-use crate::{Coherence, Fever, Lifetime, PLAYFIELD_LAYERS, Pickup, Player, Quantity, Shoot, Zees};
+use crate::{
+    Coherence, Fever, Lifetime, PLAYFIELD_LAYERS, Pickup, Player, Quantity, Shoot, Team, Zees,
+};
 
 // -------------------------------------------------------------------------------------------------
 
+/// Entity is a bullet and does bullet things such as hurting enemies.
 #[derive(Debug, b::Component)]
 #[require(p::CollidingEntities)]
-pub(crate) struct PlayerBullet;
+pub(crate) struct Bullet;
 
 /// Something that dies if shot.
 #[derive(Debug, b::Component)]
@@ -32,6 +35,9 @@ pub(crate) struct Gun {
 
     /// If positive, gun may not shoot yet.
     pub cooldown: f32,
+
+    /// Value `cooldown` is reset to after firing.
+    pub base_cooldown: f32,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -56,13 +62,13 @@ pub(crate) fn player_input_fire_gun(
 /// Spawn bullets if [`Gun::trigger`] is true.
 pub(crate) fn fire_gun_system(
     mut commands: b::Commands,
-    gun_query: b::Query<(&b::Transform, &mut Gun, b::Has<Player>)>,
+    gun_query: b::Query<(&b::Transform, &mut Gun, &Team, b::Has<Player>)>,
     coherence_query: b::Single<&Quantity, (b::With<Coherence>, b::Without<Fever>)>,
     mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
     assets: b::Res<crate::Preload>,
     images: b::Res<b::Assets<b::Image>>,
 ) -> b::Result {
-    for (gun_transform, mut gun, is_player) in gun_query {
+    for (gun_transform, mut gun, &team, is_player) in gun_query {
         if !gun.trigger || gun.cooldown != 0.0 {
             // Gun is not commanded to fire or is not ready to fire
             continue;
@@ -95,7 +101,8 @@ pub(crate) fn fire_gun_system(
                 * b::Transform::from_scale(bullet_scale.extend(1.0));
 
             commands.spawn((
-                PlayerBullet,
+                Bullet,
+                team,
                 Lifetime(0.4),
                 b::Sprite::from_image(assets.player_bullet_sprite.clone()),
                 PLAYFIELD_LAYERS,
@@ -128,7 +135,7 @@ pub(crate) fn fire_gun_system(
         ));
 
         // Side effects of firing besides a bullet.
-        gun.cooldown = 0.25;
+        gun.cooldown = gun.base_cooldown;
         if is_player {
             fever_query.adjust(0.1 * coherence);
         }
@@ -151,27 +158,32 @@ pub(crate) fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
 
 pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
-    bullet_query: b::Query<(&p::CollidingEntities, &mut Lifetime), b::With<PlayerBullet>>,
-    mut target_query: b::Query<(&mut Attackable, &b::Transform)>,
+    bullet_query: b::Query<(&Team, &p::CollidingEntities, &mut Lifetime), b::With<Bullet>>,
+    mut target_query: b::Query<(&Team, &mut Attackable, &b::Transform)>,
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
-    'bullet: for (collisions, mut bullet_lifetime) in bullet_query {
+    'bullet: for (bullet_team, collisions, mut bullet_lifetime) in bullet_query {
         if bullet_lifetime.0 == 0.0 {
             // this bullet may have already hit something and is expiring later
             continue 'bullet;
         }
         'colliding: for &colliding_entity in &collisions.0 {
-            if killed.contains(&colliding_entity) {
-                // already killed but not yet despawned; skip
-                continue 'colliding;
-            }
-            let Ok((mut attackable, &attackable_transform)) =
+            let Ok((&target_team, mut attackable, &attackable_transform)) =
                 target_query.get_mut(colliding_entity)
             else {
                 // collided but is not attackable
                 continue 'colliding;
             };
+
+            if !bullet_team.should_hurt(target_team) {
+                continue 'colliding;
+            }
+
+            if killed.contains(&colliding_entity) {
+                // already killed but not yet despawned; skip
+                continue 'colliding;
+            }
 
             let new_health = attackable.health.saturating_sub(1);
             let is_killed = new_health == 0;

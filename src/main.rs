@@ -20,15 +20,15 @@ use rand::RngExt as _;
 // -------------------------------------------------------------------------------------------------
 
 mod bullets_and_targets;
-use bullets_and_targets::{Gun, PlayerBullet};
+use bullets_and_targets::{Bullet, Gun};
 
 mod enemy;
 
 mod rendering;
-use crate::quantity::{Coherence, Fervor, Fever, Quantity};
-use crate::rendering::{PLAYFIELD_LAYERS, SCALING_MARGIN, UI_LAYERS, Zees};
+use rendering::{PLAYFIELD_LAYERS, SCALING_MARGIN, UI_LAYERS, Zees};
 
 mod quantity;
+use quantity::{Coherence, Fervor, Fever, Quantity};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -139,6 +139,19 @@ const PLAYFIELD_RECT: b::Rect = b::Rect {
 #[derive(Debug, b::Component)]
 #[require(b::Transform, p::CollidingEntities)]
 struct Player;
+
+/// Which side of the fight this entity belongs to.
+/// Bullets and damageable entities need to be on a team.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, b::Component)]
+enum Team {
+    Player,
+    Enemy,
+}
+impl Team {
+    pub fn should_hurt(self, other_team: Team) -> bool {
+        other_team != self
+    }
+}
 
 #[derive(Debug, b::Component)]
 struct StarfieldSpawner {
@@ -292,6 +305,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
     let player_sprite_asset = asset_server.load("player.png");
     commands.spawn((
         Player,
+        Team::Player,
         b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, Zees::Player.z()),
         b::Sprite::from_image(player_sprite_asset.clone()),
         PLAYFIELD_LAYERS,
@@ -317,6 +331,7 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
         p::Collider::circle(8.),
         Gun {
             cooldown: 0.0,
+            base_cooldown: 0.5,
             trigger: false,
         },
     ));
@@ -381,14 +396,14 @@ fn pause_unpause_observer(
 fn expire_lifetimes(
     mut commands: b::Commands,
     time: b::Res<b::Time>,
-    query: b::Query<(b::Entity, &mut Lifetime, b::Has<PlayerBullet>)>,
+    query: b::Query<(b::Entity, &mut Lifetime, Option<&Team>, b::Has<Bullet>)>,
     mut coherence: b::Single<
         &mut Quantity,
         (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
     >,
 ) {
     let delta = time.delta_secs();
-    for (entity, mut lifetime, is_bullet) in query {
+    for (entity, mut lifetime, team, is_bullet) in query {
         let new_lifetime = lifetime.0 - delta;
         if new_lifetime > 0. {
             lifetime.0 = new_lifetime;
@@ -396,7 +411,7 @@ fn expire_lifetimes(
             commands.entity(entity).despawn();
 
             // If this is a bullet, then if it expired, it is a miss; lose coherence.
-            if is_bullet {
+            if is_bullet && team.copied() == Some(Team::Player) {
                 coherence.adjust(-0.01);
             }
         }

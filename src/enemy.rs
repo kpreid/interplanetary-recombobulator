@@ -3,7 +3,8 @@ use bevy::math::{Vec2, vec2};
 use bevy::prelude as b;
 
 use crate::{
-    Gun, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Pickup, Preload, Zees, bullets_and_targets::Attackable,
+    Gun, Lifetime, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Pickup, Preload, Team, Zees,
+    bullets_and_targets::Attackable,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -71,10 +72,12 @@ pub(crate) fn spawn_enemies_system(
 
 fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
     (
+        Team::Enemy,
         Attackable {
             health: 10,
             drops: true,
         },
+        Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
         EnemyShipAi,
         Pickup::Damage(0.1), // enemies damage if touched
         b::Transform::from_translation(position.extend(Zees::Enemy.z())),
@@ -85,6 +88,7 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
         p::LinearVelocity(vec2(0.0, -40.0)),
         Gun {
             cooldown: 0.0,
+            base_cooldown: 2.0,
             trigger: false,
         },
     )
@@ -93,10 +97,7 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
 // -------------------------------------------------------------------------------------------------
 
 pub(crate) fn enemy_ship_ai(query: b::Query<&mut Gun, b::With<EnemyShipAi>>) {
-    // TODO: before enemies can shoot we need to fix friendly fire
-    if false {
-        for mut gun in query {
-            gun.trigger = true;
-        }
+    for mut gun in query {
+        gun.trigger = true;
     }
 }
