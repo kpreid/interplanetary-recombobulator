@@ -82,14 +82,17 @@ fn main() {
         .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(
             b::FixedUpdate,
-            // put these in *some* order for consistency
+            // These need to be ordered because which order they run in affects mechanics.
+            // Besides the questions of bullet range and who wins, there is also an interaction
+            // between expire_lifetimes and bullet_hit_system for which  it is expected that
+            // expirations happen on the next frame and not the current one.
             (
                 expire_lifetimes,
                 pickup_system,
                 bullets_and_targets::bullet_hit_system,
             )
                 .chain()
-                .run_if(b::in_state(MyStates::Playing)), // must not run before assets loaded
+                .run_if(b::in_state(MyStates::Playing)),
         )
         .add_systems(
             b::FixedUpdate,
@@ -149,7 +152,10 @@ struct StarfieldSpawner {
     cooldown: f32,
 }
 
-/// Decremented by game time and despawns the entity when it is zero
+/// Decremented by game time and despawns the entity when it is zero.
+///
+/// Note that this component is also treated slightly specially for bullets;
+/// a value of zero is used to indicate that the
 #[derive(Debug, b::Component)]
 struct Lifetime(f32);
 

@@ -2,7 +2,6 @@ use avian2d::prelude as p;
 use bevy::ecs::entity::EntityHashSet;
 use bevy::math::{Vec2, vec2, vec3};
 use bevy::prelude as b;
-use bevy::utils::default;
 use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
 
@@ -11,6 +10,7 @@ use crate::{Coherence, Fever, Lifetime, PLAYFIELD_LAYERS, Pickup, Player, Quanti
 // -------------------------------------------------------------------------------------------------
 
 #[derive(Debug, b::Component)]
+#[require(p::CollidingEntities)]
 pub(crate) struct PlayerBullet;
 
 /// Something that dies if shot.
@@ -38,7 +38,6 @@ pub(crate) struct Gun {
 pub(crate) fn shoot(
     _shoot: b::On<bei::Fire<Shoot>>,
     mut commands: b::Commands,
-    time: b::Res<b::Time>,
     gun_query: b::Query<(&b::Transform, &mut Gun), b::With<Player>>,
     coherence_query: b::Single<&Quantity, (b::With<Coherence>, b::Without<Fever>)>,
     mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
@@ -86,6 +85,8 @@ pub(crate) fn shoot(
             bullet_transform,
         ));
 
+        // Muzzle flash sprite is transformed exactly like the bullet, but does not move forward.
+        // This helps avoid fast bullets look disconnected.
         commands.spawn((
             Lifetime(0.04),
             b::Sprite::from_image(assets.muzzle_flash_sprite.clone()),
@@ -126,17 +127,14 @@ pub(crate) fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
 
 pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
-    bullet_query: b::Query<
-        (b::Entity, &p::CollidingEntities, &mut Lifetime),
-        b::With<PlayerBullet>,
-    >,
+    bullet_query: b::Query<(&p::CollidingEntities, &mut Lifetime), b::With<PlayerBullet>>,
     mut target_query: b::Query<(&mut Attackable, &b::Transform)>,
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
-    'bullet: for (bullet_entity, collisions, mut bullet_lifetime) in bullet_query {
+    'bullet: for (collisions, mut bullet_lifetime) in bullet_query {
         if bullet_lifetime.0 == 0.0 {
-            // this bullet may have already hit something and is expiring
+            // this bullet may have already hit something and is expiring later
             continue 'bullet;
         }
         'colliding: for &colliding_entity in &collisions.0 {
