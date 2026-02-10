@@ -91,6 +91,8 @@ fn main() {
             (
                 expire_lifetimes,
                 pickup_system,
+                bullets_and_targets::gun_cooldown,
+                enemy::enemy_ship_ai,
                 bullets_and_targets::fire_gun_system,
                 bullets_and_targets::bullet_hit_system,
             )
@@ -110,11 +112,7 @@ fn main() {
         )
         .add_systems(
             b::FixedUpdate,
-            (
-                bullets_and_targets::gun_cooldown,
-                enemy::spawn_enemies_system,
-                spawn_starfield_system,
-            )
+            (enemy::spawn_enemies_system, spawn_starfield_system)
                 .run_if(b::in_state(MyStates::Playing)),
         )
         .add_observer(bullets_and_targets::player_input_fire_gun)

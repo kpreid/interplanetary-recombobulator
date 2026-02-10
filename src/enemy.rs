@@ -8,11 +8,16 @@ use crate::{
 
 // -------------------------------------------------------------------------------------------------
 
+/// Component attached to a (currently) singleton entity that spawns enemies in a pattern.
 #[derive(Debug, b::Component)]
 pub(crate) struct EnemySpawner {
     pub cooldown: f32,
     pub spawn_pattern_state: usize,
 }
+
+/// Component adding enemy ship behaviors.
+#[derive(Debug, b::Component)]
+pub(crate) struct EnemyShipAi;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -70,6 +75,7 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
             health: 10,
             drops: true,
         },
+        EnemyShipAi,
         Pickup::Damage(0.1), // enemies damage if touched
         b::Transform::from_translation(position.extend(Zees::Enemy.z())),
         b::Sprite::from_image(assets.enemy_sprite.clone()),
@@ -82,4 +88,15 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
             trigger: false,
         },
     )
+}
+
+// -------------------------------------------------------------------------------------------------
+
+pub(crate) fn enemy_ship_ai(query: b::Query<&mut Gun, b::With<EnemyShipAi>>) {
+    // TODO: before enemies can shoot we need to fix friendly fire
+    if false {
+        for mut gun in query {
+            gun.trigger = true;
+        }
+    }
 }
