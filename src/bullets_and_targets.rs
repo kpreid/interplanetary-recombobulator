@@ -68,8 +68,12 @@ pub(crate) fn shoot(
 
     for bullet_angle_index in -3..=3 {
         let bullet_angle_rad = bullet_angle_index as f32 * bullet_angle_step_rad;
-
         let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
+        let bullet_transform = origin_of_bullets_transform
+            * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
+            * b::Transform::from_translation(vec3(0.0, bullet_box_size.y / 2., 0.0))
+            * b::Transform::from_scale(bullet_scale.extend(1.0));
+
         commands.spawn((
             PlayerBullet,
             Lifetime(0.4),
@@ -79,10 +83,14 @@ pub(crate) fn shoot(
             p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
             p::Collider::ellipse(sprite_size.x / 2., sprite_size.y / 2.),
             p::CollidingEntities::default(), // for dealing damage
-            origin_of_bullets_transform
-                * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
-                * b::Transform::from_translation(vec3(0.0, bullet_box_size.y / 2., 0.0))
-                * b::Transform::from_scale(bullet_scale.extend(1.0)),
+            bullet_transform,
+        ));
+
+        commands.spawn((
+            Lifetime(0.04),
+            b::Sprite::from_image(assets.muzzle_flash_sprite.clone()),
+            PLAYFIELD_LAYERS,
+            bullet_transform,
         ));
     }
 

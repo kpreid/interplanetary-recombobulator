@@ -174,6 +174,7 @@ enum MyStates {
 /// Assets that we use for things spawned after startup.
 #[derive(b::Resource, bevy_asset_loader::asset_collection::AssetCollection)]
 struct Preload {
+    // Enemy assets
     #[asset(path = "player.png")] // TODO: enemy sprite
     enemy_sprite: b::Handle<b::Image>,
     #[asset(path = "enemy-hurt.ogg")]
@@ -181,18 +182,23 @@ struct Preload {
     #[asset(path = "enemy-kill.ogg")]
     enemy_kill_sound: b::Handle<b::AudioSource>,
 
+    // Player assets
     #[asset(path = "player-bullet.png")]
     player_bullet_sprite: b::Handle<b::Image>,
     #[asset(path = "shoot.ogg")]
     shoot_sound: b::Handle<b::AudioSource>,
 
+    // Pickups
     #[asset(path = "pickup-cool.png")]
     pickup_cool_sprite: b::Handle<b::Image>,
     #[asset(path = "pickup.ogg")]
     pickup_sound: b::Handle<b::AudioSource>,
 
+    // Misc
     #[asset(path = "star.png")]
     star_sprite: b::Handle<b::Image>,
+    #[asset(path = "muzzle-flash.png")]
+    muzzle_flash_sprite: b::Handle<b::Image>,
 }
 
 // -------------------------------------------------------------------------------------------------
