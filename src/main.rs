@@ -91,7 +91,6 @@ fn main() {
                 update_status_text_system,
             ),
         )
-        .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(
             b::FixedUpdate,
             // These need to be ordered because which order they run in affects mechanics.
@@ -100,6 +99,7 @@ fn main() {
             // expirations happen on the next frame and not the current one.
             (
                 expire_lifetimes,
+                apply_movement,
                 pickup_system,
                 bullets_and_targets::gun_cooldown,
                 enemy::enemy_ship_ai,
