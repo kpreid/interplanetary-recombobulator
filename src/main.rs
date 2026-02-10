@@ -79,8 +79,9 @@ fn main() {
         //.add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
         .add_systems(
             b::Startup,
-            (rendering::setup_camera_system, setup_gameplay, setup_ui).chain(),
+            (rendering::setup_camera_system, setup_gameplay).chain(),
         )
+        .add_systems(b::OnExit(GameState::AssetLoading), setup_ui)
         .add_systems(b::OnEnter(GameState::Playing), unpause)
         .add_systems(b::OnExit(GameState::Playing), pause)
         .add_observer(pause_unpause_observer)
@@ -241,6 +242,12 @@ struct Preload {
     #[asset(path = "pickup.ogg")]
     pickup_sound: b::Handle<b::AudioSource>,
 
+    // UI
+    #[asset(path = "bar-frame.png")]
+    bar_frame_sprite: b::Handle<b::Image>,
+    #[asset(path = "bar-fill.png")]
+    bar_fill_sprite: b::Handle<b::Image>,
+
     // Misc
     #[asset(path = "star.png")]
     star_sprite: b::Handle<b::Image>,
@@ -268,32 +275,31 @@ struct Escape;
 fn setup_ui(
     mut commands: b::Commands,
     asset_server: b::Res<b::AssetServer>,
+    assets: b::Res<Preload>,
     coherence: b::Single<b::Entity, (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>)>,
     fever: b::Single<b::Entity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     fervor: b::Single<b::Entity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
 ) {
     commands.spawn((
         b::Sprite::from_image(asset_server.load("playfield-frame.png")),
-        b::Transform::from_xyz(0., 0., Zees::UiElement.z()),
+        b::Transform::from_xyz(0., 0., Zees::UiFront.z()),
         UI_LAYERS,
     ));
 
-    let bar_fill_image = asset_server.load("bar-fill.png");
-
     commands.spawn(bar_bundle(
-        &bar_fill_image,
+        &assets,
         "Coherence",
         *coherence,
         vec2(PLAYFIELD_RECT.min.x - 20.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
-        &bar_fill_image,
+        &assets,
         "Fever",
         *fever,
         vec2(PLAYFIELD_RECT.min.x - 60.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
-        &bar_fill_image,
+        &assets,
         "Fervor",
         *fervor,
         vec2(PLAYFIELD_RECT.min.x - 100.0, PLAYFIELD_RECT.min.y),
@@ -317,7 +323,7 @@ fn setup_ui(
 
 /// Build the UI for a [`Quantity`] bar
 fn bar_bundle(
-    bar_fill_image: &b::Handle<b::Image>,
+    assets: &Preload,
     label: &str,
     quantity_entity: b::Entity,
     position: Vec2,
@@ -325,7 +331,14 @@ fn bar_bundle(
     (
         b::children![
             (
-                b::Sprite::from_image(bar_fill_image.clone()),
+                b::Sprite::from_image(assets.bar_frame_sprite.clone()),
+                b::Transform::from_translation(vec3(0.0, 0.0, Zees::UiFront.z())),
+                bevy::sprite::Anchor::CENTER_LEFT,
+                UI_LAYERS,
+            ),
+            (
+                b::Sprite::from_image(assets.bar_fill_sprite.clone()),
+                b::Transform::from_translation(vec3(2.0, 0.0, Zees::UiMiddle.z())),
                 bevy::sprite::Anchor::CENTER_LEFT,
                 quantity::UpdateFromQuantity(quantity_entity),
                 UI_LAYERS,
@@ -334,13 +347,13 @@ fn bar_bundle(
                 b::Text2d::new(label),
                 b::TextLayout::new_with_justify(b::Justify::Left),
                 bevy::sprite::Anchor::CENTER_LEFT,
-                b::Transform::from_translation(vec3(0.0, 20.0, 0.0)),
+                b::Transform::from_translation(vec3(0.0, 20.0, Zees::UiFront.z())),
                 UI_LAYERS,
             )
         ],
         b::Visibility::default(), // needed for hierarchy https://bevy.org/learn/errors/b0004/
         b::Transform {
-            translation: position.extend(Zees::UiElement.z()),
+            translation: position.extend(0.0),
             rotation: b::Quat::from_rotation_z(PI / 2.),
             ..default()
         },

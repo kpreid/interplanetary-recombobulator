@@ -26,7 +26,12 @@ pub(crate) enum Zees {
     Bullets = -1,
     Enemy = 0,
     Player = 1,
-    UiElement = 2,
+    // Note: While we assign different Zs to UI elements, currently, they are rendered
+    // using a separate `RenderLayers` and so making these lower than gameplay elements will
+    // not have any effect
+    UiBack = 10,
+    UiMiddle = 11,
+    UiFront = 12,
 }
 impl Zees {
     pub fn z(self) -> f32 {
