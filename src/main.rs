@@ -337,7 +337,15 @@ fn bar_bundle(
                 UI_LAYERS,
             ),
             (
-                b::Sprite::from_image(assets.bar_fill_sprite.clone()),
+                b::Sprite {
+                    image: assets.bar_fill_sprite.clone(),
+                    image_mode: b::SpriteImageMode::Tiled {
+                        tile_x: true,
+                        tile_y: true,
+                        stretch_value: 1.0,
+                    },
+                    ..default()
+                },
                 b::Transform::from_translation(vec3(2.0, 0.0, Zees::UiMiddle.z())),
                 bevy::sprite::Anchor::CENTER_LEFT,
                 quantity::UpdateFromQuantity(quantity_entity),

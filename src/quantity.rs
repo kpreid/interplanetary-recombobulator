@@ -1,4 +1,4 @@
-use bevy::math::vec3;
+use bevy::math::{vec2, vec3};
 use bevy::prelude as b;
 
 use crate::rendering::PlayfieldCamera;
@@ -87,12 +87,11 @@ pub(crate) fn update_quantity_display_system_1(
 
 pub(crate) fn update_quantity_display_system_2(
     quantities: b::Query<&Quantity>,
-    bars_to_update: b::Query<(&mut b::Transform, &UpdateFromQuantity)>,
+    bars_to_update: b::Query<(&mut b::Sprite, &UpdateFromQuantity)>,
 ) -> b::Result {
-    for (mut bar_transform, ufq) in bars_to_update {
+    for (mut sprite, ufq) in bars_to_update {
         let quantity = quantities.get(ufq.0)?.value;
-        // TODO: establish a constant for bar height instead
-        bar_transform.scale = vec3((SCREEN_SIZE.y as f32 - 20.0) / 16.0 * quantity, 1.0, 1.0);
+        sprite.custom_size = Some(vec2(459.0 * quantity, 16.0));
     }
     Ok(())
 }
