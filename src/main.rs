@@ -9,6 +9,7 @@ use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3, Vec3Swizzles as _, ivec2, vec2, vec3};
 use bevy::prelude as b;
 use bevy::state::app::AppExtStates as _;
+use bevy::state::state::StateSet as _;
 use bevy::utils::default;
 use bevy_asset_loader::asset_collection::AssetCollection; // required by derive macro :(
 use bevy_asset_loader::loading_state::LoadingStateAppExt as _;
@@ -65,10 +66,11 @@ fn main() {
                     ..default()
                 }),
         )
-        .init_state::<MyStates>()
+        .init_state::<GameState>()
+        .add_sub_state::<NotPlaying>()
         .add_loading_state(
-            bevy_asset_loader::loading_state::LoadingState::new(MyStates::AssetLoading)
-                .continue_to_state(MyStates::Playing)
+            bevy_asset_loader::loading_state::LoadingState::new(GameState::AssetLoading)
+                .continue_to_state(GameState::Playing)
                 .load_collection::<Preload>(),
         )
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
@@ -79,8 +81,8 @@ fn main() {
             b::Startup,
             (rendering::setup_camera_system, setup_gameplay, setup_ui).chain(),
         )
-        .add_systems(b::OnEnter(MyStates::Playing), unpause)
-        .add_systems(b::OnExit(MyStates::Playing), pause)
+        .add_systems(b::OnEnter(GameState::Playing), unpause)
+        .add_systems(b::OnExit(GameState::Playing), pause)
         .add_observer(pause_unpause_observer)
         .add_systems(
             b::Update,
@@ -105,7 +107,7 @@ fn main() {
                 bullets_and_targets::bullet_hit_system,
             )
                 .chain()
-                .run_if(b::in_state(MyStates::Playing)),
+                .run_if(b::in_state(GameState::Playing)),
         )
         .add_systems(
             b::FixedUpdate,
@@ -121,7 +123,7 @@ fn main() {
         .add_systems(
             b::FixedUpdate,
             (enemy::spawn_enemies_system, spawn_starfield_system)
-                .run_if(b::in_state(MyStates::Playing)),
+                .run_if(b::in_state(GameState::Playing)),
         )
         .add_observer(bullets_and_targets::player_input_fire_gun)
         .run();
@@ -188,11 +190,27 @@ enum Pickup {
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, b::States)]
-enum MyStates {
+enum GameState {
     #[default]
     AssetLoading,
+
+    /// Game not yet started, or game over
+    /// Either way, show a menu
+    NotPlaying,
+
     Playing,
+
     Paused,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, b::SubStates)]
+#[source(GameState = GameState::NotPlaying)]
+enum NotPlaying {
+    #[default]
+    NoGameYet,
+
+    // TODO: put stats like “number of kills” and “accuracy” in here
+    GameOver,
 }
 
 #[derive(Debug, b::Component)]
@@ -407,13 +425,13 @@ fn unpause(mut time: b::ResMut<b::Time<p::Physics>>) {
 
 fn pause_unpause_observer(
     _event: b::On<bei::Start<Escape>>,
-    state: b::ResMut<b::State<MyStates>>,
-    mut next_state: b::ResMut<b::NextState<MyStates>>,
+    state: b::ResMut<b::State<GameState>>,
+    mut next_state: b::ResMut<b::NextState<GameState>>,
 ) {
     next_state.set_if_neq(match *state.get() {
-        MyStates::AssetLoading => return,
-        MyStates::Playing => MyStates::Paused,
-        MyStates::Paused => MyStates::Playing,
+        GameState::AssetLoading | GameState::NotPlaying => return,
+        GameState::Playing => GameState::Paused,
+        GameState::Paused => GameState::Playing,
     });
 }
 
@@ -547,13 +565,18 @@ fn star_bundle(assets: &Preload, fast_forward: f32) -> impl b::Bundle {
 // -------------------------------------------------------------------------------------------------
 
 fn update_status_text_system(
-    state: b::Res<b::State<MyStates>>,
+    state: b::Res<b::State<GameState>>,
+    not_playing_state: Option<b::Res<b::State<NotPlaying>>>,
     mut text: b::Single<&mut b::Text2d, b::With<StatusText>>,
 ) {
     let new_text = match *state.get() {
-        MyStates::AssetLoading => "Loading",
-        MyStates::Playing => "",
-        MyStates::Paused => "Paused",
+        GameState::AssetLoading => "Loading",
+        GameState::NotPlaying => match *not_playing_state.unwrap().get() {
+            NotPlaying::NoGameYet => "...", // TODO: insert game name etc
+            NotPlaying::GameOver => "Game Over",
+        },
+        GameState::Playing => "",
+        GameState::Paused => "Paused",
     };
 
     if ***text != new_text {

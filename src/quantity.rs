@@ -1,8 +1,8 @@
 use bevy::math::vec3;
 use bevy::prelude as b;
 
-use crate::SCREEN_SIZE;
 use crate::rendering::PlayfieldCamera;
+use crate::{GameState, NotPlaying, SCREEN_SIZE};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -58,8 +58,16 @@ pub(crate) fn quantity_behaviors_system(
     >,
     fever: b::Single<&mut Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
+    mut next_state: b::ResMut<b::NextState<GameState>>,
+    mut next_np_state: b::ResMut<b::NextState<NotPlaying>>,
 ) -> b::Result {
     // TODO: handle interactions between quantities
+
+    if fever.value == 1.0 {
+        next_state.set(GameState::NotPlaying);
+        next_np_state.set(NotPlaying::GameOver);
+    }
+
     Ok(())
 }
 
