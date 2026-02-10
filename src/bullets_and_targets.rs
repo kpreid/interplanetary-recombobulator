@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use avian2d::prelude as p;
 use bevy::ecs::entity::EntityHashSet;
 use bevy::math::{Vec2, vec2, vec3};
@@ -78,7 +80,10 @@ pub(crate) fn fire_gun_system(
         let mut origin_of_bullets_transform: b::Transform = *gun_transform;
         origin_of_bullets_transform.translation.z = Zees::Bullets.z();
 
-        let coherence = coherence_query.value;
+        let (coherence, base_shooting_angle): (f32, f32) = match team {
+            Team::Player => (coherence_query.value, 0.0),
+            Team::Enemy => (0.0, PI),
+        };
 
         let base_bullet_speed = 400.0 + coherence.powi(2) * 20000.0;
         let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
@@ -93,7 +98,7 @@ pub(crate) fn fire_gun_system(
         let bullet_box_size = sprite_size * bullet_scale;
 
         for bullet_angle_index in -3..=3 {
-            let bullet_angle_rad = bullet_angle_index as f32 * bullet_angle_step_rad;
+            let bullet_angle_rad = base_shooting_angle + bullet_angle_index as f32 * bullet_angle_step_rad;
             let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
             let bullet_transform = origin_of_bullets_transform
                 * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
