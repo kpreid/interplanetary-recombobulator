@@ -201,10 +201,9 @@ pub(crate) fn bullet_hit_system(
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
     'bullet: for (bullet_team, collisions, mut bullet_lifetime) in bullet_query {
-        if bullet_lifetime.0 == 0.0 {
-            // this bullet may have already hit something and is expiring later
-            continue 'bullet;
-        }
+        // Note that a bullet may hit multiple targets and kill them if its collider
+        // is large enough. This is on purpose to make high Coherence shots more effective.
+
         'colliding: for &colliding_entity in &collisions.0 {
             let Ok((&target_team, mut attackable, &attackable_transform)) =
                 target_query.get_mut(colliding_entity)
@@ -266,10 +265,7 @@ pub(crate) fn bullet_hit_system(
                 attackable_transform,
             ));
 
-            // each bullet hits at most one entity and dies
-            //commands.entity(bullet_entity).despawn();
-            bullet_lifetime.0 = 0.0; // cause bullet to die on the next frame for visual purposes
-            continue 'bullet; // don't hit anything else
+            bullet_lifetime.0 = 0.0; // cause bullet to die on the next frame
         }
     }
     Ok(())
