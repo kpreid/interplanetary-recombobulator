@@ -98,7 +98,8 @@ pub(crate) fn fire_gun_system(
         let bullet_box_size = sprite_size * bullet_scale;
 
         for bullet_angle_index in -3..=3 {
-            let bullet_angle_rad = base_shooting_angle + bullet_angle_index as f32 * bullet_angle_step_rad;
+            let bullet_angle_rad =
+                base_shooting_angle + bullet_angle_index as f32 * bullet_angle_step_rad;
             let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
             let bullet_transform = origin_of_bullets_transform
                 * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
@@ -109,7 +110,13 @@ pub(crate) fn fire_gun_system(
                 Bullet,
                 team,
                 Lifetime(0.4),
-                b::Sprite::from_image(assets.player_bullet_sprite.clone()),
+                b::Sprite::from_image(
+                    match team {
+                        Team::Player => &assets.player_bullet_sprite,
+                        Team::Enemy => &assets.enemy_bullet_sprite,
+                    }
+                    .clone(),
+                ),
                 PLAYFIELD_LAYERS,
                 p::RigidBody::Kinematic,
                 p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),

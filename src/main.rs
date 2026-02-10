@@ -191,6 +191,8 @@ struct Preload {
     // Enemy assets
     #[asset(path = "player.png")] // TODO: enemy sprite
     enemy_sprite: b::Handle<b::Image>,
+    #[asset(path = "enemy-bullet.png")]
+    enemy_bullet_sprite: b::Handle<b::Image>,
     #[asset(path = "enemy-hurt.ogg")]
     enemy_hurt_sound: b::Handle<b::AudioSource>,
     #[asset(path = "enemy-kill.ogg")]
