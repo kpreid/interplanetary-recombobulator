@@ -20,7 +20,9 @@ use rand::RngExt as _;
 // -------------------------------------------------------------------------------------------------
 
 mod bullets_and_targets;
-use bullets_and_targets::{Attackable, Gun, PlayerBullet};
+use bullets_and_targets::{Gun, PlayerBullet};
+
+mod enemy;
 
 mod rendering;
 use crate::quantity::{Coherence, Fervor, Fever, Quantity};
@@ -110,7 +112,7 @@ fn main() {
             b::FixedUpdate,
             (
                 bullets_and_targets::gun_cooldown,
-                spawn_enemies_system,
+                enemy::spawn_enemies_system,
                 spawn_starfield_system,
             )
                 .run_if(b::in_state(MyStates::Playing)),
@@ -139,12 +141,6 @@ const PLAYFIELD_RECT: b::Rect = b::Rect {
 #[derive(Debug, b::Component)]
 #[require(b::Transform, p::CollidingEntities)]
 struct Player;
-
-#[derive(Debug, b::Component)]
-struct EnemySpawner {
-    cooldown: f32,
-    spawn_pattern_state: usize,
-}
 
 #[derive(Debug, b::Component)]
 struct StarfieldSpawner {
@@ -321,14 +317,17 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
             )
         ]),
         p::Collider::circle(8.),
-        Gun { cooldown: 0.0, trigger: false, },
+        Gun {
+            cooldown: 0.0,
+            trigger: false,
+        },
     ));
 
     commands.spawn((Coherence, Quantity { value: 1.0 }));
     commands.spawn((Fever, Quantity { value: 0.5 }));
     commands.spawn((Fervor, Quantity { value: 0.0 }));
 
-    commands.spawn(EnemySpawner {
+    commands.spawn(enemy::EnemySpawner {
         cooldown: 0.0,
         spawn_pattern_state: 0,
     });
@@ -503,71 +502,5 @@ fn star_bundle(assets: &Preload, fast_forward: f32) -> impl b::Bundle {
         // Note: no collider because it doesn't interact with anything
         p::LinearVelocity(velocity),
         Lifetime(20.0), // TODO: would be more efficient to detect when the sprite is off the screen
-    )
-}
-
-// -------------------------------------------------------------------------------------------------
-
-fn spawn_enemies_system(
-    mut commands: b::Commands,
-    time: b::Res<b::Time>,
-    spawners: b::Query<&mut EnemySpawner>,
-    assets: b::Res<crate::Preload>,
-) {
-    const SPAWN_PATTERN: [[u8; 10]; 10] = [
-        *b" X X  X X ",
-        *b"  X    X  ",
-        *b" X X  X X ",
-        *b"          ",
-        *b"          ",
-        *b"   XXXX   ",
-        *b"   X  X   ",
-        *b"  X XX X  ",
-        *b"   X  X   ",
-        *b"          ",
-    ];
-
-    let delta = time.delta_secs();
-    for mut spawner in spawners {
-        let EnemySpawner {
-            cooldown,
-            spawn_pattern_state,
-        }: &mut EnemySpawner = &mut *spawner;
-        if *cooldown > 0.0 {
-            *cooldown = (*cooldown - delta).max(0.0);
-        } else {
-            *cooldown = 2.0;
-            let row_to_spawn = &SPAWN_PATTERN[*spawn_pattern_state % SPAWN_PATTERN.len()];
-            *spawn_pattern_state = (*spawn_pattern_state + 1) % SPAWN_PATTERN.len();
-
-            for (i, &ch) in row_to_spawn.iter().enumerate() {
-                let x = PLAYFIELD_RECT.min.x
-                    + i as f32 * (PLAYFIELD_RECT.size().x / (row_to_spawn.len() - 1) as f32);
-                match ch {
-                    b' ' => {}
-                    b'X' => {
-                        commands.spawn(enemy_bundle(&assets, vec2(x, PLAYFIELD_RECT.max.y)));
-                    }
-                    _ => unreachable!(),
-                }
-            }
-        }
-    }
-}
-
-fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
-    (
-        Attackable {
-            health: 10,
-            drops: true,
-        },
-        Pickup::Damage(0.1), // enemies damage if touched
-        b::Transform::from_translation(position.extend(Zees::Enemy.z())),
-        b::Sprite::from_image(assets.enemy_sprite.clone()),
-        PLAYFIELD_LAYERS,
-        p::RigidBody::Kinematic,
-        p::Collider::circle(8.),
-        p::LinearVelocity(vec2(0.0, -40.0)),
-        Gun { cooldown: 0.0, trigger: false },
     )
 }
