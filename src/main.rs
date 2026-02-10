@@ -6,7 +6,7 @@ use avian2d::prelude::{self as p, PhysicsTime as _};
 use bevy::app::PluginGroup as _;
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::spawn::SpawnRelated as _;
-use bevy::math::{Vec2, Vec3Swizzles as _, ivec2, vec2, vec3};
+use bevy::math::{Vec2, Vec3, Vec3Swizzles as _, ivec2, vec2, vec3};
 use bevy::prelude as b;
 use bevy::state::app::AppExtStates as _;
 use bevy::utils::default;
@@ -15,6 +15,7 @@ use bevy_asset_loader::loading_state::LoadingStateAppExt as _;
 use bevy_asset_loader::loading_state::config::ConfigureLoadingState as _;
 use bevy_enhanced_input::prelude as bei;
 use bevy_enhanced_input::prelude::InputContextAppExt as _;
+use rand::RngExt as _;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -103,7 +104,11 @@ fn main() {
         )
         .add_systems(
             b::FixedUpdate,
-            (bullets_and_targets::gun_cooldown, spawn_enemies_system)
+            (
+                bullets_and_targets::gun_cooldown,
+                spawn_enemies_system,
+                spawn_starfield_system,
+            )
                 .run_if(b::in_state(MyStates::Playing)),
         )
         .add_observer(bullets_and_targets::shoot)
@@ -135,6 +140,13 @@ struct Player;
 struct EnemySpawner {
     cooldown: f32,
     spawn_pattern_state: usize,
+}
+
+#[derive(Debug, b::Component)]
+struct StarfieldSpawner {
+    /// set to true on the first frame only
+    startup: bool,
+    cooldown: f32,
 }
 
 /// Decremented by game time and despawns the entity when it is zero
@@ -178,6 +190,9 @@ struct Preload {
     pickup_cool_sprite: b::Handle<b::Image>,
     #[asset(path = "pickup.ogg")]
     pickup_sound: b::Handle<b::AudioSource>,
+
+    #[asset(path = "star.png")]
+    star_sprite: b::Handle<b::Image>,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -304,6 +319,10 @@ fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer
         cooldown: 0.0,
         spawn_pattern_state: 0,
     });
+    commands.spawn(StarfieldSpawner {
+        startup: true,
+        cooldown: 0.0,
+    });
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -419,6 +438,63 @@ fn pickup_system(
 
 // -------------------------------------------------------------------------------------------------
 
+fn spawn_starfield_system(
+    mut commands: b::Commands,
+    time: b::Res<b::Time>,
+    spawners: b::Query<&mut StarfieldSpawner>,
+    assets: b::Res<crate::Preload>,
+) {
+    let spawn_period = 0.02;
+
+    let delta = time.delta_secs();
+    for mut spawner in spawners {
+        let StarfieldSpawner { startup, cooldown }: &mut StarfieldSpawner = &mut *spawner;
+        if *startup {
+            *startup = false;
+
+            // TODO: would be cleaner to calculate the number to spawn based on velocity,
+            // but that's harder
+            for t in (0..1000).map(|i| i as f32 * spawn_period) {
+                commands.spawn(star_bundle(&assets, t));
+            }
+        } else if *cooldown > 0.0 {
+            *cooldown = (*cooldown - delta).max(0.0);
+        } else {
+            *cooldown = spawn_period;
+
+            commands.spawn(star_bundle(&assets, 0.0));
+        }
+    }
+}
+
+fn star_bundle(assets: &Preload, fast_forward: f32) -> impl b::Bundle {
+    let overflow_x = 30.0;
+
+    let velocity = vec2(
+        0.0, //rand::rng().random_range(-10.0..=10.0),
+        -rand::rng().random_range(40.0..=120.0),
+    );
+    let x = rand::rng()
+        .random_range(PLAYFIELD_RECT.min.x - overflow_x..=PLAYFIELD_RECT.max.x + overflow_x);
+    let y = PLAYFIELD_RECT.max.y + 80. + rand::rng().random_range(0.0..=30.0); // start offscreen
+    (
+        b::Sprite::from_image(assets.star_sprite.clone()),
+        b::Transform::from_translation(
+            (vec2(x, y) + velocity * fast_forward).extend(Zees::Starfield.z()),
+        )
+        .with_rotation(b::Quat::from_rotation_z(-velocity.angle_to(Vec2::NEG_Y)))
+        .with_scale(Vec3::splat(2.0)),
+        PLAYFIELD_LAYERS,
+        p::RigidBody::Kinematic,
+        p::Collider::circle(1.0), // TODO: use a simple movement system w/o physics
+        // Note: no collider because it doesn't interact with anything
+        p::LinearVelocity(velocity),
+        Lifetime(20.0), // TODO: would be more efficient to detect when the sprite is off the screen
+    )
+}
+
+// -------------------------------------------------------------------------------------------------
+
 fn spawn_enemies_system(
     mut commands: b::Commands,
     time: b::Res<b::Time>,
@@ -452,7 +528,8 @@ fn spawn_enemies_system(
             *spawn_pattern_state = (*spawn_pattern_state + 1) % SPAWN_PATTERN.len();
 
             for (i, &ch) in row_to_spawn.iter().enumerate() {
-                let x = PLAYFIELD_RECT.min.x + i as f32 * (PLAYFIELD_RECT.size().x / (row_to_spawn.len() - 1) as f32);
+                let x = PLAYFIELD_RECT.min.x
+                    + i as f32 * (PLAYFIELD_RECT.size().x / (row_to_spawn.len() - 1) as f32);
                 match ch {
                     b' ' => {}
                     b'X' => {

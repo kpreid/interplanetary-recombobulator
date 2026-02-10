@@ -19,8 +19,9 @@ pub(crate) const PLAYFIELD_LAYERS: RenderLayers = RenderLayers::layer(0);
 pub(crate) const UI_LAYERS: RenderLayers = RenderLayers::layer(1);
 pub(crate) const HIGH_RES_LAYERS: RenderLayers = RenderLayers::layer(2);
 
-/// Z position values for sprites for when disambiguation is needed
+/// Z position values for sprites for when disambiguation may be needed
 pub(crate) enum Zees {
+    Starfield = -3,
     Pickup = -2,
     Bullets = -1,
     Enemy = 0,
