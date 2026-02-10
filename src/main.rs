@@ -578,7 +578,7 @@ fn update_status_text_system(
         GameState::AssetLoading => "Loading",
         GameState::NotPlaying => match *not_playing_state.unwrap().get() {
             NotPlaying::NoGameYet => "...", // TODO: insert game name etc
-            NotPlaying::GameOver => "Game Over",
+            NotPlaying::GameOver => "Game Overheated",
         },
         GameState::Playing => "",
         GameState::Paused => "Paused",
