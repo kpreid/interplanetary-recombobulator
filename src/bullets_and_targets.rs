@@ -57,7 +57,9 @@ pub(crate) fn shoot(
 
     let base_bullet_speed = 400.0 + coherence.powi(2) * 20000.0;
     let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
-    let bullet_scale = vec2(1.0, (base_bullet_speed * 0.001).max(1.0));
+    // bullets scaled so that they overlap themselves from frame to frame,
+    // for both reliable collisions and for good visuals.
+    let bullet_scale = vec2(1.0, (base_bullet_speed * 0.003).max(1.0));
 
     let sprite_size = images
         .get(&assets.player_bullet_sprite)
