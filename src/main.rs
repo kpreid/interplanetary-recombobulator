@@ -82,7 +82,13 @@ fn main() {
         .add_systems(b::OnEnter(MyStates::Playing), unpause)
         .add_systems(b::OnExit(MyStates::Playing), pause)
         .add_observer(pause_unpause_observer)
-        .add_systems(b::Update, rendering::fit_canvas_to_window_system)
+        .add_systems(
+            b::Update,
+            (
+                rendering::fit_canvas_to_window_system,
+                update_status_text_system,
+            ),
+        )
         .add_systems(b::FixedUpdate, apply_movement)
         .add_systems(
             b::FixedUpdate,
@@ -138,6 +144,8 @@ const PLAYFIELD_RECT: b::Rect = b::Rect {
 // -------------------------------------------------------------------------------------------------
 
 /// Player ship entity
+///
+/// Note that player-related entities are also identified by [`Team`].
 #[derive(Debug, b::Component)]
 #[require(b::Transform, p::CollidingEntities)]
 struct Player;
@@ -186,6 +194,9 @@ enum MyStates {
     Playing,
     Paused,
 }
+
+#[derive(Debug, b::Component)]
+struct StatusText;
 
 /// Assets that we use for things spawned after startup.
 #[derive(b::Resource, bevy_asset_loader::asset_collection::AssetCollection)]
@@ -268,6 +279,16 @@ fn setup_ui(
         "Fervor",
         *fervor,
         vec2(PLAYFIELD_RECT.min.x - 100.0, PLAYFIELD_RECT.min.y),
+    ));
+
+    // Gameplay status text
+    commands.spawn((
+        StatusText,
+        b::Text2d::new(""),
+        b::TextLayout::new_with_justify(b::Justify::Center),
+        bevy::sprite::Anchor::CENTER,
+        b::Transform::from_translation(vec3(0.0, 20.0, 0.0)),
+        UI_LAYERS,
     ));
 }
 
@@ -521,4 +542,22 @@ fn star_bundle(assets: &Preload, fast_forward: f32) -> impl b::Bundle {
         p::LinearVelocity(velocity),
         Lifetime(20.0), // TODO: would be more efficient to detect when the sprite is off the screen
     )
+}
+
+// -------------------------------------------------------------------------------------------------
+
+fn update_status_text_system(
+    state: b::Res<b::State<MyStates>>,
+    mut text: b::Single<&mut b::Text2d, b::With<StatusText>>,
+) {
+    let new_text = match *state.get() {
+        MyStates::AssetLoading => "Loading",
+        MyStates::Playing => "",
+        MyStates::Paused => "Paused",
+    };
+
+    if ***text != new_text {
+        text.clear();
+        text.push_str(new_text);
+    }
 }
