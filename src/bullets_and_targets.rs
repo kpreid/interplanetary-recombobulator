@@ -102,7 +102,14 @@ pub(crate) fn fire_gun_system(
                 base_shooting_angle + bullet_angle_index as f32 * bullet_angle_step_rad;
             let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
             let bullet_transform = origin_of_bullets_transform
-                * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
+                * b::Transform::from_rotation(b::Quat::from_rotation_z(
+                    // don't rotate sprite more than ±90° so the highlight is good
+                    if bullet_angle_rad.cos() < 0.0 {
+                        bullet_angle_rad + PI
+                    } else {
+                        bullet_angle_rad
+                    },
+                ))
                 * b::Transform::from_translation(vec3(0.0, bullet_box_size.y / 2., 0.0))
                 * b::Transform::from_scale(bullet_scale.extend(1.0));
 
