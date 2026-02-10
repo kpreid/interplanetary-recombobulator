@@ -1,6 +1,6 @@
 use avian2d::prelude as p;
 use bevy::ecs::entity::EntityHashSet;
-use bevy::math::{Vec2, vec2};
+use bevy::math::{Vec2, vec2, vec3};
 use bevy::prelude as b;
 use bevy::utils::default;
 use bevy_enhanced_input::prelude as bei;
@@ -38,10 +38,12 @@ pub(crate) struct Gun {
 pub(crate) fn shoot(
     _shoot: b::On<bei::Fire<Shoot>>,
     mut commands: b::Commands,
+    time: b::Res<b::Time>,
     gun_query: b::Query<(&b::Transform, &mut Gun), b::With<Player>>,
     coherence_query: b::Single<&Quantity, (b::With<Coherence>, b::Without<Fever>)>,
     mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
     assets: b::Res<crate::Preload>,
+    images: b::Res<b::Assets<b::Image>>,
 ) -> b::Result {
     let (player_transform, mut gun) = gun_query.single_inner()?;
 
@@ -58,6 +60,12 @@ pub(crate) fn shoot(
     let base_bullet_speed = 400.0 + coherence.powi(2) * 10.0;
     let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
 
+    let sprite_size = images
+        .get(&assets.player_bullet_sprite)
+        .ok_or_else(|| b::BevyError::from("asset not loaded"))?
+        .size_f32();
+    let bullet_box_size = sprite_size * bullet_scale;
+
     for bullet_angle_index in -3..=3 {
         let bullet_angle_rad = bullet_angle_index as f32 * bullet_angle_step_rad;
 
@@ -69,15 +77,12 @@ pub(crate) fn shoot(
             PLAYFIELD_LAYERS,
             p::RigidBody::Kinematic,
             p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
-            // constants are sprite size
-            p::Collider::rectangle(4. * bullet_scale.x, 8. * bullet_scale.y),
+            p::Collider::ellipse(sprite_size.x / 2., sprite_size.y / 2.),
             p::CollidingEntities::default(), // for dealing damage
             origin_of_bullets_transform
-                * b::Transform {
-                    rotation: b::Quat::from_rotation_z(bullet_angle_rad),
-                    scale: bullet_scale.extend(1.0),
-                    ..default()
-                },
+                * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
+                * b::Transform::from_translation(vec3(0.0, bullet_box_size.y / 2., 0.0))
+                * b::Transform::from_scale(bullet_scale.extend(1.0)),
         ));
     }
 
