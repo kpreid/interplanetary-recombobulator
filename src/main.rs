@@ -77,11 +77,12 @@ fn main() {
         .add_input_context::<Player>()
         .add_plugins(avian2d::PhysicsPlugins::default())
         //.add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
+        .add_systems(b::Startup, rendering::setup_camera_system)
         .add_systems(
-            b::Startup,
-            (rendering::setup_camera_system, setup_gameplay).chain(),
+            b::OnExit(GameState::AssetLoading),
+            // These are startup systems except that they need the assets resource
+            (setup_gameplay, setup_ui).chain(),
         )
-        .add_systems(b::OnExit(GameState::AssetLoading), setup_ui)
         .add_systems(b::OnEnter(GameState::Playing), unpause)
         .add_systems(b::OnExit(GameState::Playing), pause)
         .add_observer(pause_unpause_observer)
@@ -231,6 +232,8 @@ struct Preload {
     enemy_kill_sound: b::Handle<b::AudioSource>,
 
     // Player assets
+    #[asset(path = "player.png")]
+    player_ship_sprite: b::Handle<b::Image>,
     #[asset(path = "player-bullet.png")]
     player_bullet_sprite: b::Handle<b::Image>,
     #[asset(path = "shoot.ogg")]
@@ -369,14 +372,12 @@ fn bar_bundle(
 }
 
 /// Spawn the entities that participate in gameplay rules and which exist forever.
-fn setup_gameplay(mut commands: b::Commands, asset_server: b::Res<b::AssetServer>) {
-    // player sprite
-    let player_sprite_asset = asset_server.load("player.png");
+fn setup_gameplay(mut commands: b::Commands, assets: b::Res<Preload>) {
     commands.spawn((
         Player,
         Team::Player,
         b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, Zees::Player.z()),
-        b::Sprite::from_image(player_sprite_asset.clone()),
+        b::Sprite::from_image(assets.player_ship_sprite.clone()),
         PLAYFIELD_LAYERS,
         bei::actions!(Player[
             (
