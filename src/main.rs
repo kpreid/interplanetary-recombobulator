@@ -70,7 +70,7 @@ fn main() {
         .add_sub_state::<NotPlaying>()
         .add_loading_state(
             bevy_asset_loader::loading_state::LoadingState::new(GameState::AssetLoading)
-                .continue_to_state(GameState::Playing)
+                .continue_to_state(GameState::NotPlaying)
                 .load_collection::<Preload>(),
         )
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
@@ -80,13 +80,15 @@ fn main() {
         //.add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
         .add_systems(
             b::Startup,
-            (rendering::setup_camera_system, setup_non_game_input),
+            (
+                rendering::setup_camera_system,
+                setup_non_game_input,
+                setup_status_text,
+                setup_permanent_gameplay,
+            ),
         )
-        .add_systems(
-            b::OnExit(GameState::AssetLoading),
-            // These are startup systems except that they need the assets resource
-            (setup_gameplay, setup_ui).chain(),
-        )
+        .add_systems(b::OnExit(GameState::AssetLoading), setup_ui)
+        .add_systems(b::OnExit(GameState::NotPlaying), start_new_game)
         .add_systems(b::OnEnter(GameState::Playing), unpause)
         .add_systems(b::OnExit(GameState::Playing), pause)
         .add_observer(pause_unpause_observer)
@@ -295,6 +297,24 @@ fn setup_non_game_input(mut commands: b::Commands) {
     ));
 }
 
+/// Early startup doesn't need assets to be ready
+fn setup_status_text(mut commands: b::Commands) {
+    // Gameplay status text
+    commands.spawn((
+        StatusText,
+        b::Text2d::new(""),
+        bevy::text::TextBounds {
+            // if we don’t set this, the text wraps undesirably, maybe because it gets changed?
+            width: Some(PLAYFIELD_SIZE.x as f32),
+            height: None,
+        },
+        b::TextLayout::new_with_justify(b::Justify::Center),
+        bevy::sprite::Anchor::CENTER,
+        b::Transform::from_translation(vec3(0.0, 20.0, 0.0)),
+        UI_LAYERS,
+    ));
+}
+
 fn setup_ui(
     mut commands: b::Commands,
     asset_server: b::Res<b::AssetServer>,
@@ -326,21 +346,6 @@ fn setup_ui(
         "Fervor",
         *fervor,
         vec2(PLAYFIELD_RECT.min.x - 100.0, PLAYFIELD_RECT.min.y),
-    ));
-
-    // Gameplay status text
-    commands.spawn((
-        StatusText,
-        b::Text2d::new(""),
-        bevy::text::TextBounds {
-            // if we don’t set this, the text wraps undesirably, maybe because it gets changed?
-            width: Some(PLAYFIELD_SIZE.x as f32),
-            height: None,
-        },
-        b::TextLayout::new_with_justify(b::Justify::Center),
-        bevy::sprite::Anchor::CENTER,
-        b::Transform::from_translation(vec3(0.0, 20.0, 0.0)),
-        UI_LAYERS,
     ));
 }
 
@@ -392,7 +397,19 @@ fn bar_bundle(
 }
 
 /// Spawn the entities that participate in gameplay rules and which exist forever.
-fn setup_gameplay(mut commands: b::Commands, assets: b::Res<Preload>) {
+/// Also the input bindings that don’t relate to the player ship.
+fn setup_permanent_gameplay(mut commands: b::Commands) {
+    commands.spawn((Coherence, Quantity { value: 1.0 }));
+    commands.spawn((Fever, Quantity { value: 0.5 }));
+    commands.spawn((Fervor, Quantity { value: 0.0 }));
+
+    commands.spawn(StarfieldSpawner {
+        startup: true,
+        cooldown: 0.0,
+    });
+}
+
+fn start_new_game(mut commands: b::Commands, assets: b::Res<Preload>) {
     commands.spawn((
         Player,
         Team::Player,
@@ -423,18 +440,22 @@ fn setup_gameplay(mut commands: b::Commands, assets: b::Res<Preload>) {
         },
     ));
 
-    commands.spawn((Coherence, Quantity { value: 1.0 }));
-    commands.spawn((Fever, Quantity { value: 0.5 }));
-    commands.spawn((Fervor, Quantity { value: 0.0 }));
-
     commands.spawn(enemy::EnemySpawner {
         cooldown: 0.0,
         spawn_pattern_state: 0,
     });
-    commands.spawn(StarfieldSpawner {
-        startup: true,
-        cooldown: 0.0,
-    });
+}
+
+// Despawn everything [`setup_gameplay`] spawns, then call it
+fn reset_gameplay(
+    mut commands: b::Commands,
+    things: b::Query<b::Entity, b::Or<(b::With<Team>, b::With<enemy::EnemySpawner>)>>,
+    assets: b::Res<Preload>,
+) {
+    for entity in things {
+        commands.entity(entity).despawn();
+    }
+    start_new_game(commands, assets)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -471,10 +492,11 @@ fn pause_unpause_observer(
     state: b::ResMut<b::State<GameState>>,
     mut next_state: b::ResMut<b::NextState<GameState>>,
 ) {
+    bevy::log::info!("pause_unpause");
     next_state.set_if_neq(match *state.get() {
-        GameState::AssetLoading | GameState::NotPlaying => return,
+        GameState::AssetLoading => return,
         GameState::Playing => GameState::Paused,
-        GameState::Paused => GameState::Playing,
+        GameState::Paused | GameState::NotPlaying => GameState::Playing,
     });
 }
 
