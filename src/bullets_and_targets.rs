@@ -200,7 +200,7 @@ pub(crate) fn bullet_hit_system(
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
-    'bullet: for (bullet_team, collisions, mut bullet_lifetime) in bullet_query {
+    for (bullet_team, collisions, mut bullet_lifetime) in bullet_query {
         // Note that a bullet may hit multiple targets and kill them if its collider
         // is large enough. This is on purpose to make high Coherence shots more effective.
 

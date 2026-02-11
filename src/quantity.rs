@@ -1,8 +1,8 @@
-use bevy::math::{vec2, vec3};
+use bevy::math::vec2;
 use bevy::prelude as b;
 
 use crate::rendering::PlayfieldCamera;
-use crate::{GameState, NotPlaying, SCREEN_SIZE};
+use crate::{GameState, NotPlaying};
 
 // -------------------------------------------------------------------------------------------------
 
