@@ -249,6 +249,8 @@ struct Preload {
     bar_fill_sprite: b::Handle<b::Image>,
     #[asset(path = "text-bar-fever.png")]
     text_bar_fever_sprite: b::Handle<b::Image>,
+    #[asset(path = "text-bar-fervor.png")]
+    text_bar_fervor_sprite: b::Handle<b::Image>,
 
     // Misc
     #[asset(path = "star.png")]
@@ -336,7 +338,7 @@ fn setup_ui(
     ));
     commands.spawn(bar_bundle(
         &assets,
-        assets.text_bar_fever_sprite.clone(),
+        assets.text_bar_fervor_sprite.clone(),
         *fervor,
         vec2(PLAYFIELD_RECT.min.x - 100.0, PLAYFIELD_RECT.min.y),
     ));
