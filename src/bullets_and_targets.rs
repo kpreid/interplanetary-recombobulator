@@ -235,6 +235,7 @@ pub(crate) fn bullet_hit_system(
                     commands.spawn((
                         b::Sprite::from_image(assets.pickup_cool_sprite.clone()),
                         Pickup::Cool(0.1),
+                        Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
                         b::Transform::from_translation(
                             attackable_transform.translation.with_z(Zees::Pickup.z()),
                         ),

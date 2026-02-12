@@ -479,7 +479,7 @@ fn despawn_game(
     mut commands: b::Commands,
     things: b::Query<
         b::Entity,
-        b::Or<(b::With<Team>, b::With<enemy::EnemySpawner>, b::With<Pickup>)>,
+        b::Or<(b::With<Team>, b::With<enemy::EnemySpawner>, b::With<Lifetime>)>,
     >,
     // assets: b::Res<Preload>,
 ) {
