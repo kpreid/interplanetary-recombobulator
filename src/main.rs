@@ -9,7 +9,6 @@ use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3, Vec3Swizzles as _, ivec2, vec2, vec3};
 use bevy::prelude as b;
 use bevy::state::app::AppExtStates as _;
-use bevy::state::state::StateSet as _;
 use bevy::utils::default;
 use bevy_asset_loader::asset_collection::AssetCollection; // required by derive macro :(
 use bevy_asset_loader::loading_state::LoadingStateAppExt as _;
@@ -67,10 +66,9 @@ fn main() {
                 }),
         )
         .init_state::<GameState>()
-        .add_sub_state::<NotPlaying>()
         .add_loading_state(
             bevy_asset_loader::loading_state::LoadingState::new(GameState::AssetLoading)
-                .continue_to_state(GameState::NotPlaying)
+                .continue_to_state(GameState::NotStarted)
                 .load_collection::<Preload>(),
         )
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
@@ -88,7 +86,8 @@ fn main() {
             ),
         )
         .add_systems(b::OnExit(GameState::AssetLoading), setup_ui)
-        .add_systems(b::OnExit(GameState::NotPlaying), start_new_game)
+        .add_systems(b::OnExit(GameState::NotStarted), start_new_game)
+        .add_systems(b::OnExit(GameState::GameOver), despawn_game)
         .add_systems(b::OnEnter(GameState::Playing), unpause)
         .add_systems(b::OnExit(GameState::Playing), pause)
         .add_observer(pause_unpause_observer)
@@ -120,7 +119,7 @@ fn main() {
         .add_systems(
             b::FixedUpdate,
             (
-                quantity::quantity_behaviors_system,
+                quantity::quantity_behaviors_system.run_if(b::in_state(GameState::Playing)),
                 (
                     quantity::update_quantity_display_system_1,
                     quantity::update_quantity_display_system_2,
@@ -202,22 +201,14 @@ enum GameState {
     #[default]
     AssetLoading,
 
-    /// Game not yet started, or game over
-    /// Either way, show a menu
-    NotPlaying,
+    /// Game not started. Game entities do not exist.
+    NotStarted,
 
     Playing,
 
     Paused,
-}
 
-#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, b::SubStates)]
-#[source(GameState = GameState::NotPlaying)]
-enum NotPlaying {
-    #[default]
-    NoGameYet,
-
-    // TODO: put stats like “number of kills” and “accuracy” in here
+    /// Game entities exist but are frozen.
     GameOver,
 }
 
@@ -399,9 +390,24 @@ fn bar_bundle(
 /// Spawn the entities that participate in gameplay rules and which exist forever.
 /// Also the input bindings that don’t relate to the player ship.
 fn setup_permanent_gameplay(mut commands: b::Commands) {
-    commands.spawn((Coherence, Quantity { value: 1.0 }));
-    commands.spawn((Fever, Quantity { value: 0.5 }));
-    commands.spawn((Fervor, Quantity { value: 0.0 }));
+    commands.spawn((
+        Coherence,
+        Quantity {
+            value: Coherence::INITIAL,
+        },
+    ));
+    commands.spawn((
+        Fever,
+        Quantity {
+            value: Fever::INITIAL,
+        },
+    ));
+    commands.spawn((
+        Fervor,
+        Quantity {
+            value: Fervor::INITIAL,
+        },
+    ));
 
     commands.spawn(StarfieldSpawner {
         startup: true,
@@ -409,7 +415,26 @@ fn setup_permanent_gameplay(mut commands: b::Commands) {
     });
 }
 
-fn start_new_game(mut commands: b::Commands, assets: b::Res<Preload>) {
+fn start_new_game(
+    mut commands: b::Commands,
+    assets: b::Res<Preload>,
+    mut coherence: b::Single<
+        &mut Quantity,
+        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
+    >,
+    mut fever: b::Single<
+        &mut Quantity,
+        (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
+    >,
+    mut fervor: b::Single<
+        &mut Quantity,
+        (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
+    >,
+) {
+    coherence.value = Coherence::INITIAL;
+    fever.value = Fever::INITIAL;
+    fervor.value = Fervor::INITIAL;
+
     commands.spawn((
         Player,
         Team::Player,
@@ -446,16 +471,20 @@ fn start_new_game(mut commands: b::Commands, assets: b::Res<Preload>) {
     });
 }
 
-// Despawn everything [`setup_gameplay`] spawns, then call it
-fn reset_gameplay(
+// Despawn everything [`start_new_game`] spawns
+fn despawn_game(
     mut commands: b::Commands,
-    things: b::Query<b::Entity, b::Or<(b::With<Team>, b::With<enemy::EnemySpawner>)>>,
-    assets: b::Res<Preload>,
+    things: b::Query<
+        b::Entity,
+        b::Or<(b::With<Team>, b::With<enemy::EnemySpawner>, b::With<Pickup>)>,
+    >,
+    // assets: b::Res<Preload>,
 ) {
+    bevy::log::info!("despawn_game");
     for entity in things {
         commands.entity(entity).despawn();
     }
-    start_new_game(commands, assets)
+    // start_new_game(commands, assets)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -496,7 +525,8 @@ fn pause_unpause_observer(
     next_state.set_if_neq(match *state.get() {
         GameState::AssetLoading => return,
         GameState::Playing => GameState::Paused,
-        GameState::Paused | GameState::NotPlaying => GameState::Playing,
+        GameState::Paused | GameState::NotStarted => GameState::Playing,
+        GameState::GameOver => GameState::NotStarted,
     });
 }
 
@@ -631,15 +661,12 @@ fn star_bundle(assets: &Preload, fast_forward: f32) -> impl b::Bundle {
 
 fn update_status_text_system(
     state: b::Res<b::State<GameState>>,
-    not_playing_state: Option<b::Res<b::State<NotPlaying>>>,
     mut text: b::Single<&mut b::Text2d, b::With<StatusText>>,
 ) {
     let new_text = match *state.get() {
         GameState::AssetLoading => "Loading",
-        GameState::NotPlaying => match *not_playing_state.unwrap().get() {
-            NotPlaying::NoGameYet => "...", // TODO: insert game name etc
-            NotPlaying::GameOver => "Game Overheated",
-        },
+        GameState::NotStarted => "Ready", // TODO: make this blank once we have other menu UI
+        GameState::GameOver => "Game Overheated",
         GameState::Playing => "",
         GameState::Paused => "Paused",
     };

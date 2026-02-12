@@ -1,8 +1,8 @@
 use bevy::math::vec2;
 use bevy::prelude as b;
 
+use crate::GameState;
 use crate::rendering::PlayfieldCamera;
-use crate::{GameState, NotPlaying};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -28,6 +28,17 @@ pub(crate) struct Fervor;
 /// Specifies a [`Quantity`] this entity should update its visual appearance (e.g. bar length) from.
 #[derive(Debug, b::Component)]
 pub(crate) struct UpdateFromQuantity(pub b::Entity);
+
+// These constants are each the initial value of their corresponding `Quantity`
+impl Coherence {
+    pub const INITIAL: f32 = 1.0;
+}
+impl Fever {
+    pub const INITIAL: f32 = 0.5;
+}
+impl Fervor {
+    pub const INITIAL: f32 = 0.0;
+}
 
 // -------------------------------------------------------------------------------------------------
 
@@ -59,13 +70,11 @@ pub(crate) fn quantity_behaviors_system(
     fever: b::Single<&mut Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
     mut next_state: b::ResMut<b::NextState<GameState>>,
-    mut next_np_state: b::ResMut<b::NextState<NotPlaying>>,
 ) -> b::Result {
     // TODO: handle interactions between quantities
 
     if fever.value == 1.0 {
-        next_state.set(GameState::NotPlaying);
-        next_np_state.set(NotPlaying::GameOver);
+        next_state.set_if_neq(GameState::GameOver);
     }
 
     Ok(())
