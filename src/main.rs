@@ -247,6 +247,8 @@ struct Preload {
     bar_frame_sprite: b::Handle<b::Image>,
     #[asset(path = "bar-fill.png")]
     bar_fill_sprite: b::Handle<b::Image>,
+    #[asset(path = "text-bar-fever.png")]
+    text_bar_fever_sprite: b::Handle<b::Image>,
 
     // Misc
     #[asset(path = "star.png")]
@@ -322,19 +324,19 @@ fn setup_ui(
 
     commands.spawn(bar_bundle(
         &assets,
-        "Coherence",
+        assets.text_bar_fever_sprite.clone(),
         *coherence,
         vec2(PLAYFIELD_RECT.min.x - 20.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
         &assets,
-        "Fever",
+        assets.text_bar_fever_sprite.clone(),
         *fever,
         vec2(PLAYFIELD_RECT.min.x - 60.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
         &assets,
-        "Fervor",
+        assets.text_bar_fever_sprite.clone(),
         *fervor,
         vec2(PLAYFIELD_RECT.min.x - 100.0, PLAYFIELD_RECT.min.y),
     ));
@@ -343,7 +345,7 @@ fn setup_ui(
 /// Build the UI for a [`Quantity`] bar
 fn bar_bundle(
     assets: &Preload,
-    label: &str,
+    label: b::Handle<b::Image>,
     quantity_entity: b::Entity,
     position: Vec2,
 ) -> impl b::Bundle {
@@ -371,10 +373,11 @@ fn bar_bundle(
                 UI_LAYERS,
             ),
             (
-                b::Text2d::new(label),
-                b::TextLayout::new_with_justify(b::Justify::Left),
+                b::Sprite::from_image(label),
+                //b::Text2d::new(label),
+                //b::TextLayout::new_with_justify(b::Justify::Left),
                 bevy::sprite::Anchor::CENTER_LEFT,
-                b::Transform::from_translation(vec3(0.0, 20.0, Zees::UiFront.z())),
+                b::Transform::from_translation(vec3(10.0, 13.0, Zees::UiFront2.z())),
                 UI_LAYERS,
             )
         ],
