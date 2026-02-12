@@ -75,9 +75,13 @@ fn main() {
         )
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
         .add_input_context::<Player>()
+        .add_input_context::<NonGameInput>()
         .add_plugins(avian2d::PhysicsPlugins::default())
         //.add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
-        .add_systems(b::Startup, rendering::setup_camera_system)
+        .add_systems(
+            b::Startup,
+            (rendering::setup_camera_system, setup_non_game_input),
+        )
         .add_systems(
             b::OnExit(GameState::AssetLoading),
             // These are startup systems except that they need the assets resource
@@ -260,6 +264,10 @@ struct Preload {
 
 // -------------------------------------------------------------------------------------------------
 
+/// Context entity for inputs that shouldn’t depend on gameplay state, such as the escape key.
+#[derive(Debug, b::Component)]
+struct NonGameInput;
+
 #[derive(Debug, bei::InputAction)]
 #[action_output(b::Vec2)]
 struct Move;
@@ -273,7 +281,19 @@ struct Shoot;
 struct Escape;
 
 // -------------------------------------------------------------------------------------------------
-// Startup systems
+// Startup systems (not all literally `Startup` schedule)
+
+fn setup_non_game_input(mut commands: b::Commands) {
+    commands.spawn((
+        NonGameInput,
+        bei::actions!(
+            NonGameInput[(
+                bei::Action::<Escape>::new(),
+                bei::bindings![b::KeyCode::Escape, b::GamepadButton::Start],
+            )]
+        ),
+    ));
+}
 
 fn setup_ui(
     mut commands: b::Commands,
@@ -392,10 +412,6 @@ fn setup_gameplay(mut commands: b::Commands, assets: b::Res<Preload>) {
             (
                 bei::Action::<Shoot>::new(),
                 bei::bindings![b::KeyCode::Space, b::GamepadButton::South],
-            ),
-            (
-                bei::Action::<Escape>::new(),
-                bei::bindings![b::KeyCode::Escape, b::GamepadButton::Start],
             )
         ]),
         p::Collider::circle(8.),
