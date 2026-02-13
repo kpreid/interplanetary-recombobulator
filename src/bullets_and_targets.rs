@@ -187,7 +187,7 @@ pub(crate) fn fire_gun_system(
         // Side effects of firing besides a bullet.
         gun.cooldown = gun.base_cooldown;
         if is_player {
-            fever_query.adjust(0.1 * coherence);
+            fever_query.adjust_temporary_and_commit_previous_temporary(0.1 * coherence);
         }
     }
 
@@ -313,7 +313,7 @@ pub(crate) fn player_health_is_fever_system(
         let damage = u8::MAX - attackable.health;
         if damage > 0 {
             attackable.health = u8::MAX;
-            fever_query.adjust(damage as f32 * 0.1);
+            fever_query.adjust_permanent_including_temporary(damage as f32 * 0.1);
         }
     }
 }

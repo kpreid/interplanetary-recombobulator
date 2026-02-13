@@ -247,8 +247,10 @@ struct Preload {
     // UI
     #[asset(path = "bar-frame.png")]
     bar_frame_sprite: b::Handle<b::Image>,
-    #[asset(path = "bar-fill.png")]
-    bar_fill_sprite: b::Handle<b::Image>,
+    #[asset(path = "bar-fill-base.png")]
+    bar_fill_base_sprite: b::Handle<b::Image>,
+    #[asset(path = "bar-fill-temporary.png")]
+    bar_fill_temporary_sprite: b::Handle<b::Image>,
     #[asset(path = "text-bar-coherence.png")]
     text_bar_coherence_sprite: b::Handle<b::Image>,
     #[asset(path = "text-bar-fever.png")]
@@ -365,7 +367,25 @@ fn bar_bundle(
             ),
             (
                 b::Sprite {
-                    image: assets.bar_fill_sprite.clone(),
+                    image: assets.bar_fill_base_sprite.clone(),
+                    image_mode: b::SpriteImageMode::Tiled {
+                        tile_x: true,
+                        tile_y: true,
+                        stretch_value: 1.0,
+                    },
+                    ..default()
+                },
+                b::Transform::from_translation(vec3(2.0, 0.0, Zees::UiBack.z())),
+                bevy::sprite::Anchor::CENTER_LEFT,
+                quantity::UpdateFromQuantity {
+                    quantity_entity,
+                    property: quantity::UpdateProperty::BaseValueToLength,
+                },
+                UI_LAYERS,
+            ),
+            (
+                b::Sprite {
+                    image: assets.bar_fill_temporary_sprite.clone(),
                     image_mode: b::SpriteImageMode::Tiled {
                         tile_x: true,
                         tile_y: true,
@@ -375,7 +395,10 @@ fn bar_bundle(
                 },
                 b::Transform::from_translation(vec3(2.0, 0.0, Zees::UiMiddle.z())),
                 bevy::sprite::Anchor::CENTER_LEFT,
-                quantity::UpdateFromQuantity(quantity_entity),
+                quantity::UpdateFromQuantity {
+                    quantity_entity,
+                    property: quantity::UpdateProperty::TemporaryValueToLength,
+                },
                 UI_LAYERS,
             ),
             (
@@ -554,8 +577,9 @@ fn expire_lifetimes(
             commands.entity(entity).despawn();
 
             // If this is a bullet, then if it expired, it is a miss; lose coherence.
+            // TODO: use temporary loss that recovers if hit, instead
             if is_bullet && team.copied() == Some(Team::Player) {
-                coherence.adjust(-0.01);
+                coherence.adjust_permanent_including_temporary(-0.01);
             }
         }
     }
@@ -579,7 +603,7 @@ fn pickup_system(
 
         match *pickup {
             Pickup::Damage(amount) => {
-                fever.adjust(amount);
+                fever.adjust_permanent_including_temporary(amount);
 
                 player_attackable.hurt_flash();
 
@@ -587,7 +611,7 @@ fn pickup_system(
             }
             // TODO: additional damage SFX
             Pickup::Cool(amount) => {
-                fever.adjust(-amount);
+                fever.adjust_permanent_ignoring_temporary(-amount);
                 sound_asset = Some(assets.pickup_sound.clone());
             }
         }

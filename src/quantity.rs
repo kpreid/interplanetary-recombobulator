@@ -11,7 +11,11 @@ use crate::rendering::PlayfieldCamera;
 #[derive(Debug, b::Component)]
 pub(crate) struct Quantity {
     /// Base value of the quantity, persisting unless changed.
-    value: f32,
+    base: f32,
+
+    /// An increase which becomes permanent if another increase is applied before this is removed.
+    /// How removals happen depend on the specific quantity.
+    temporary_stack: f32,
 }
 
 /// [`Quantity`] 1/3; affects shooting.
@@ -27,8 +31,18 @@ pub(crate) struct Fever;
 pub(crate) struct Fervor;
 
 /// Specifies a [`Quantity`] this entity should update its visual appearance (e.g. bar length) from.
+/// Does not specify what type of update should be performed.
 #[derive(Debug, b::Component)]
-pub(crate) struct UpdateFromQuantity(pub b::Entity);
+pub(crate) struct UpdateFromQuantity {
+    pub quantity_entity: b::Entity,
+    pub property: UpdateProperty,
+}
+
+#[derive(Debug)]
+pub(crate) enum UpdateProperty {
+    BaseValueToLength,
+    TemporaryValueToLength,
+}
 
 // These constants are each the initial value of their corresponding `Quantity`
 impl Coherence {
@@ -45,14 +59,26 @@ impl Fervor {
 
 impl Quantity {
     pub fn new(value: f32) -> Self {
-        Self { value }
+        Self {
+            base: value,
+            temporary_stack: 0.0,
+        }
     }
 
-    pub fn adjust(&mut self, delta: f32) {
-        self.set_clamped(self.value + delta);
+    pub fn adjust_permanent_including_temporary(&mut self, delta: f32) {
+        self.set_clamped(self.effective_value() + delta);
     }
 
-    pub fn set_clamped(&mut self, value: f32) {
+    pub fn adjust_permanent_ignoring_temporary(&mut self, delta: f32) {
+        self.set_clamped(self.base + delta);
+    }
+
+    pub fn adjust_temporary_and_commit_previous_temporary(&mut self, delta: f32) {
+        self.set_clamped(self.effective_value());
+        self.temporary_stack = delta;
+    }
+
+    fn set_clamped(&mut self, value: f32) {
         if value.is_nan() {
             if cfg!(debug_assertions) {
                 panic!("NaN value");
@@ -60,12 +86,13 @@ impl Quantity {
                 return;
             }
         }
-        self.value = value.clamp(0.0, 1.0);
+        self.base = value.clamp(0.0, 1.0);
+        self.temporary_stack = 0.0;
     }
 
     /// Value which should apply to gameplay effects.
     pub fn effective_value(&self) -> f32 {
-        self.value
+        self.base + self.temporary_stack
     }
 }
 
@@ -73,23 +100,31 @@ impl Quantity {
 
 #[expect(unused_variables)]
 pub(crate) fn quantity_behaviors_system(
+    time: b::Res<b::Time>,
     coherence: b::Single<
         &mut Quantity,
         (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
     >,
-    fever: b::Single<&mut Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
+    mut fever: b::Single<
+        &mut Quantity,
+        (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
+    >,
     fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
     mut next_state: b::ResMut<b::NextState<GameState>>,
 ) -> b::Result {
-    // TODO: handle interactions between quantities
+    // TODO: implement interactions between quantities
 
-    if fever.value == 1.0 {
+    // Excess fever goes away if not committed
+    fever.temporary_stack *= 0.3f32.powf(time.delta_secs());
+
+    if fever.effective_value() == 1.0 {
         next_state.set_if_neq(GameState::GameOver);
     }
 
     Ok(())
 }
 
+/// Updates display in quantity-specific ways
 pub(crate) fn update_quantity_display_system_1(
     //coherence: b::Single<&Quantity, b::With<Coherence>>,
     fever: b::Single<&Quantity, b::With<Fever>>,
@@ -97,20 +132,27 @@ pub(crate) fn update_quantity_display_system_1(
     mut pixel_camera: b::Single<&mut b::Camera, b::With<PlayfieldCamera>>,
 ) -> b::Result {
     pixel_camera.clear_color = bevy::camera::ClearColorConfig::Custom(b::Color::oklch(
-        fever.value * 0.05,
-        fever.value,
+        fever.effective_value() * 0.05,
+        fever.effective_value(),
         0.0,
     ));
     Ok(())
 }
 
+/// Updates bars for all quantities uniformly
 pub(crate) fn update_quantity_display_system_2(
     quantities: b::Query<&Quantity>,
     bars_to_update: b::Query<(&mut b::Sprite, &UpdateFromQuantity)>,
 ) -> b::Result {
+    let length_scale = 459.0;
+    let width = 16.0;
     for (mut sprite, ufq) in bars_to_update {
-        let quantity = quantities.get(ufq.0)?.value;
-        sprite.custom_size = Some(vec2(459.0 * quantity, 16.0));
+        let quantity: &Quantity = quantities.get(ufq.quantity_entity)?;
+        let value = match ufq.property {
+            UpdateProperty::BaseValueToLength => quantity.base,
+            UpdateProperty::TemporaryValueToLength => quantity.effective_value(),
+        };
+        sprite.custom_size = Some(vec2(length_scale * value, width));
     }
     Ok(())
 }
