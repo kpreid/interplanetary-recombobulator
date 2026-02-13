@@ -57,6 +57,16 @@ pub(crate) enum Pattern {
 
 // -------------------------------------------------------------------------------------------------
 
+impl Attackable {
+    pub fn hurt_flash(&mut self) {
+        if self.hurt_animation_cooldown == 0.0 {
+            self.hurt_animation_cooldown = 0.1;
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 /// Note that this is an input observer, not a system function
 pub(crate) fn player_input_fire_gun(
     _shoot: b::On<bei::Fire<Shoot>>,
@@ -229,7 +239,7 @@ pub(crate) fn bullet_hit_system(
 
             if !is_killed {
                 attackable.health = new_health;
-                attackable.hurt_animation_cooldown = 0.1;
+                attackable.hurt_flash();
             } else {
                 killed.insert(colliding_entity);
                 commands.entity(colliding_entity).despawn();

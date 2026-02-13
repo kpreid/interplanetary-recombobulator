@@ -30,7 +30,7 @@ use rendering::{PLAYFIELD_LAYERS, SCALING_MARGIN, UI_LAYERS, Zees};
 mod quantity;
 use quantity::{Coherence, Fervor, Fever, Quantity};
 
-use crate::bullets_and_targets::Pattern;
+use crate::bullets_and_targets::{Attackable, Pattern};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -448,7 +448,7 @@ fn start_new_game(
         Player,
         Team::Player,
         bullets_and_targets::Attackable {
-            /// any health below the max translates into fever increase
+            // any health below the max translates into fever increase via player_health_is_fever_system()
             health: u8::MAX,
             hurt_animation_cooldown: 0.0,
             drops: false,
@@ -578,24 +578,29 @@ fn expire_lifetimes(
 
 fn pickup_system(
     mut commands: b::Commands,
-    player_collisions: b::Single<&p::CollidingEntities, b::With<Player>>,
+    player_query: b::Single<(&p::CollidingEntities, &mut Attackable), b::With<Player>>,
     pickups: b::Query<(&Pickup, &b::Transform)>,
     mut fever: b::Single<&mut Quantity, b::With<Fever>>,
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
+    let (player_collisions, mut player_attackable) = player_query.into_inner();
     for &pickup_entity in &player_collisions.0 {
         let Ok((pickup, &pickup_transform)) = pickups.get(pickup_entity) else {
             // not a pickup
             continue;
         };
 
-        let mut sound_asset = None;
+        let sound_asset;
 
         match *pickup {
             Pickup::Damage(amount) => {
-                // TODO: damage SFX
                 fever.adjust(amount);
+
+                player_attackable.hurt_flash();
+
+                sound_asset = Some(assets.enemy_hurt_sound.clone()); // TODO: separate player hurt 
             }
+            // TODO: additional damage SFX
             Pickup::Cool(amount) => {
                 fever.adjust(-amount);
                 sound_asset = Some(assets.pickup_sound.clone());

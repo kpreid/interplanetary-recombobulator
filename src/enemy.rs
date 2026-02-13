@@ -81,7 +81,10 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
         },
         Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
         EnemyShipAi,
-        Pickup::Damage(0.1), // enemies damage if touched
+        // enemies damage if touched
+        // TODO: it would probably be better to use the bullet system than the pickup system, with
+        // some generalizations.
+        Pickup::Damage(0.1),
         b::Transform::from_translation(position.extend(Zees::Enemy.z())),
         b::Sprite::from_image(assets.enemy_sprite.clone()),
         PLAYFIELD_LAYERS,
