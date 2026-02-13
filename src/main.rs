@@ -247,6 +247,8 @@ struct Preload {
     bar_frame_sprite: b::Handle<b::Image>,
     #[asset(path = "bar-fill.png")]
     bar_fill_sprite: b::Handle<b::Image>,
+    #[asset(path = "text-bar-coherence.png")]
+    text_bar_coherence_sprite: b::Handle<b::Image>,
     #[asset(path = "text-bar-fever.png")]
     text_bar_fever_sprite: b::Handle<b::Image>,
     #[asset(path = "text-bar-fervor.png")]
@@ -327,13 +329,13 @@ fn setup_ui(
     commands.spawn(bar_bundle(
         &assets,
         assets.text_bar_fever_sprite.clone(),
-        *coherence,
+        *fever,
         vec2(PLAYFIELD_RECT.min.x - 20.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
         &assets,
-        assets.text_bar_fever_sprite.clone(),
-        *fever,
+        assets.text_bar_coherence_sprite.clone(),
+        *coherence,
         vec2(PLAYFIELD_RECT.min.x - 60.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
@@ -481,7 +483,11 @@ fn despawn_game(
     mut commands: b::Commands,
     things: b::Query<
         b::Entity,
-        b::Or<(b::With<Team>, b::With<enemy::EnemySpawner>, b::With<Lifetime>)>,
+        b::Or<(
+            b::With<Team>,
+            b::With<enemy::EnemySpawner>,
+            b::With<Lifetime>,
+        )>,
     >,
     // assets: b::Res<Preload>,
 ) {
