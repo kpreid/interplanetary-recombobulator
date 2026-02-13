@@ -8,6 +8,7 @@ use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3, Vec3Swizzles as _, ivec2, vec2, vec3};
 use bevy::prelude as b;
+use bevy::prelude::StateSet as _;
 use bevy::state::app::AppExtStates as _;
 use bevy::utils::default;
 use bevy_asset_loader::asset_collection::AssetCollection; // required by derive macro :(
@@ -69,6 +70,7 @@ fn main() {
                 }),
         )
         .init_state::<GameState>()
+        .add_sub_state::<WinOrGameOver>()
         .add_loading_state(
             bevy_asset_loader::loading_state::LoadingState::new(GameState::AssetLoading)
                 .continue_to_state(GameState::NotStarted)
@@ -90,7 +92,7 @@ fn main() {
         )
         .add_systems(b::OnExit(GameState::AssetLoading), setup_ui)
         .add_systems(b::OnExit(GameState::NotStarted), start_new_game)
-        .add_systems(b::OnExit(GameState::GameOver), despawn_game)
+        .add_systems(b::OnExit(GameState::WinOrGameOver), despawn_game)
         .add_systems(b::OnEnter(GameState::Playing), unpause)
         .add_systems(b::OnExit(GameState::Playing), pause)
         .add_observer(pause_unpause_observer)
@@ -204,7 +206,16 @@ enum GameState {
     Paused,
 
     /// Game entities exist but are frozen.
+    WinOrGameOver,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, b::SubStates)]
+#[source(GameState = GameState::WinOrGameOver)]
+enum WinOrGameOver {
+    #[default]
     GameOver,
+
+    Win,
 }
 
 #[derive(Debug, b::Component)]
@@ -548,7 +559,7 @@ fn pause_unpause_observer(
         GameState::AssetLoading => return,
         GameState::Playing => GameState::Paused,
         GameState::Paused | GameState::NotStarted => GameState::Playing,
-        GameState::GameOver => GameState::NotStarted,
+        GameState::WinOrGameOver => GameState::NotStarted,
     });
 }
 
@@ -631,12 +642,16 @@ fn star_bundle(assets: &Preload, fast_forward: f32) -> impl b::Bundle {
 
 fn update_status_text_system(
     state: b::Res<b::State<GameState>>,
+    wog_state: Option<b::Res<b::State<WinOrGameOver>>>,
     mut text: b::Single<&mut b::Text2d, b::With<StatusText>>,
 ) {
     let new_text = match *state.get() {
         GameState::AssetLoading => "Loading",
         GameState::NotStarted => "Ready", // TODO: make this blank once we have other menu UI
-        GameState::GameOver => "Game Overheated",
+        GameState::WinOrGameOver => match *wog_state.unwrap().get() {
+            WinOrGameOver::GameOver => "Game Overheated",
+            WinOrGameOver::Win => "Win",
+        },
         GameState::Playing => "",
         GameState::Paused => "Paused",
     };

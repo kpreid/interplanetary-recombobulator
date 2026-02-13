@@ -1,8 +1,8 @@
 use bevy::math::vec2;
 use bevy::prelude as b;
 
-use crate::GameState;
 use crate::rendering::PlayfieldCamera;
+use crate::{GameState, WinOrGameOver};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -102,7 +102,6 @@ impl Quantity {
 
 // -------------------------------------------------------------------------------------------------
 
-#[expect(unused_variables)]
 pub(crate) fn quantity_behaviors_system(
     time: b::Res<b::Time>,
     mut coherence: b::Single<
@@ -115,6 +114,7 @@ pub(crate) fn quantity_behaviors_system(
     >,
     fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
     mut next_state: b::ResMut<b::NextState<GameState>>,
+    mut next_wog_state: b::ResMut<b::NextState<WinOrGameOver>>,
 ) -> b::Result {
     // TODO: implement interactions between quantities
 
@@ -127,7 +127,11 @@ pub(crate) fn quantity_behaviors_system(
     fever.temporary_stack *= 0.3f32.powf(time.delta_secs());
 
     if fever.effective_value() == 1.0 {
-        next_state.set_if_neq(GameState::GameOver);
+        next_state.set_if_neq(GameState::WinOrGameOver);
+        next_wog_state.set(WinOrGameOver::GameOver);
+    } else if fervor.effective_value() >= 0.99 {
+        next_state.set_if_neq(GameState::WinOrGameOver);
+        next_wog_state.set(WinOrGameOver::Win);
     }
 
     Ok(())
