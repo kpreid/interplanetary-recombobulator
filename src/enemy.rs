@@ -76,6 +76,7 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
         Team::Enemy,
         Attackable {
             health: 10,
+            hurt_animation_cooldown: 0.0,
             drops: true,
         },
         Lifetime(20.0), // TODO: bad substitute for "die when offscreen"

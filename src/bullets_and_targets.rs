@@ -24,6 +24,9 @@ pub(crate) struct Attackable {
     /// Reduced by bullets, and when zero, this is despawned.
     pub health: u8,
 
+    /// Set to 1.0 when damage occurs, and decays to 0.0.
+    pub hurt_animation_cooldown: f32,
+
     /// If successfully killed, spawns beneficial [`crate::Pickup`]s.
     /// (this may be more than a bool later)
     pub drops: bool,
@@ -226,6 +229,7 @@ pub(crate) fn bullet_hit_system(
 
             if !is_killed {
                 attackable.health = new_health;
+                attackable.hurt_animation_cooldown = 0.1;
             } else {
                 killed.insert(colliding_entity);
                 commands.entity(colliding_entity).despawn();
@@ -270,4 +274,21 @@ pub(crate) fn bullet_hit_system(
         }
     }
     Ok(())
+}
+
+pub(crate) fn hurt_animation_system(
+    time: b::Res<b::Time>,
+    query: b::Query<(&mut b::Sprite, &mut Attackable)>,
+) {
+    // arguably this should be 2 systems, one for cooldown and one for display
+    for (mut sprite, mut attackable) in query {
+        let luminance = if attackable.hurt_animation_cooldown > 0.0 {
+            attackable.hurt_animation_cooldown =
+                (attackable.hurt_animation_cooldown - time.delta_secs()).max(0.0);
+            1000.0
+        } else {
+            1.0
+        };
+        sprite.color = b::Color::linear_rgb(luminance, luminance, luminance)
+    }
 }

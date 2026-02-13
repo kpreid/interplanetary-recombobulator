@@ -117,6 +117,10 @@ fn main() {
                 .run_if(b::in_state(GameState::Playing)),
         )
         .add_systems(
+            b::Update,
+            bullets_and_targets::hurt_animation_system,
+        )
+        .add_systems(
             b::FixedUpdate,
             (
                 quantity::quantity_behaviors_system.run_if(b::in_state(GameState::Playing)),
