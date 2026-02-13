@@ -292,3 +292,18 @@ pub(crate) fn hurt_animation_system(
         sprite.color = b::Color::linear_rgb(luminance, luminance, luminance)
     }
 }
+
+pub(crate) fn player_health_is_fever_system(
+    // Note that this query matches `Player` and not everything on `Team::Player`.
+    // This doesn't matter now but we could imagine having drones or something.
+    player_query: b::Query<&mut Attackable, b::With<Player>>,
+    mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
+) {
+    for mut attackable in player_query {
+        let damage = u8::MAX - attackable.health;
+        if damage > 0 {
+            attackable.health = u8::MAX;
+            fever_query.adjust(damage as f32 * 0.1);
+        }
+    }
+}

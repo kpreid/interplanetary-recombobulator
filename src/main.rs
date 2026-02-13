@@ -112,14 +112,12 @@ fn main() {
                 enemy::enemy_ship_ai,
                 bullets_and_targets::fire_gun_system,
                 bullets_and_targets::bullet_hit_system,
+                bullets_and_targets::player_health_is_fever_system,
             )
                 .chain()
                 .run_if(b::in_state(GameState::Playing)),
         )
-        .add_systems(
-            b::Update,
-            bullets_and_targets::hurt_animation_system,
-        )
+        .add_systems(b::Update, bullets_and_targets::hurt_animation_system)
         .add_systems(
             b::FixedUpdate,
             (
@@ -449,6 +447,12 @@ fn start_new_game(
     commands.spawn((
         Player,
         Team::Player,
+        bullets_and_targets::Attackable {
+            /// any health below the max translates into fever increase
+            health: u8::MAX,
+            hurt_animation_cooldown: 0.0,
+            drops: false,
+        },
         b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, Zees::Player.z()),
         b::Sprite::from_image(assets.player_ship_sprite.clone()),
         PLAYFIELD_LAYERS,
