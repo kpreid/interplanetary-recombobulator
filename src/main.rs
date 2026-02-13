@@ -340,19 +340,19 @@ fn setup_ui(
         &assets,
         assets.text_bar_fever_sprite.clone(),
         *fever,
-        vec2(PLAYFIELD_RECT.min.x - 20.0, PLAYFIELD_RECT.min.y),
+        vec2(PLAYFIELD_RECT.min.x - 30.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
         &assets,
         assets.text_bar_coherence_sprite.clone(),
         *coherence,
-        vec2(PLAYFIELD_RECT.min.x - 60.0, PLAYFIELD_RECT.min.y),
+        vec2(PLAYFIELD_RECT.max.x + 30.0, PLAYFIELD_RECT.min.y),
     ));
     commands.spawn(bar_bundle(
         &assets,
         assets.text_bar_fervor_sprite.clone(),
         *fervor,
-        vec2(PLAYFIELD_RECT.min.x - 100.0, PLAYFIELD_RECT.min.y),
+        vec2(PLAYFIELD_RECT.max.x + 70.0, PLAYFIELD_RECT.min.y),
     ));
 }
 
