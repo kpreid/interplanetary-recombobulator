@@ -399,24 +399,9 @@ fn bar_bundle(
 /// Spawn the entities that participate in gameplay rules and which exist forever.
 /// Also the input bindings that don’t relate to the player ship.
 fn setup_permanent_gameplay(mut commands: b::Commands) {
-    commands.spawn((
-        Coherence,
-        Quantity {
-            value: Coherence::INITIAL,
-        },
-    ));
-    commands.spawn((
-        Fever,
-        Quantity {
-            value: Fever::INITIAL,
-        },
-    ));
-    commands.spawn((
-        Fervor,
-        Quantity {
-            value: Fervor::INITIAL,
-        },
-    ));
+    commands.spawn((Coherence, Quantity::new(Coherence::INITIAL)));
+    commands.spawn((Fever, Quantity::new(Fever::INITIAL)));
+    commands.spawn((Fervor, Quantity::new(Fervor::INITIAL)));
 
     commands.spawn(StarfieldSpawner {
         startup: true,
@@ -440,9 +425,9 @@ fn start_new_game(
         (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
     >,
 ) {
-    coherence.value = Coherence::INITIAL;
-    fever.value = Fever::INITIAL;
-    fervor.value = Fervor::INITIAL;
+    **coherence = Quantity::new(Coherence::INITIAL);
+    **fever = Quantity::new(Fever::INITIAL);
+    **fervor = Quantity::new(Fervor::INITIAL);
 
     commands.spawn((
         Player,

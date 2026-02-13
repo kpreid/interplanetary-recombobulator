@@ -111,7 +111,7 @@ pub(crate) fn fire_gun_system(
         // 1 + 2 * spread_count is the number of bullets
         let (coherence, spread_count): (f32, i32) = match gun.pattern {
             Pattern::Single => (0.0, 0),
-            Pattern::Coherent => (coherence_query.value, 3),
+            Pattern::Coherent => (coherence_query.effective_value(), 3),
         };
 
         let base_bullet_speed = 400.0 + coherence.powi(2) * 20000.0;

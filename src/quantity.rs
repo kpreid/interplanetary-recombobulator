@@ -10,7 +10,8 @@ use crate::rendering::PlayfieldCamera;
 /// Other components on this entity define which quantity it is and how systems affect it.
 #[derive(Debug, b::Component)]
 pub(crate) struct Quantity {
-    pub value: f32,
+    /// Base value of the quantity, persisting unless changed.
+    value: f32,
 }
 
 /// [`Quantity`] 1/3; affects shooting.
@@ -43,6 +44,10 @@ impl Fervor {
 // -------------------------------------------------------------------------------------------------
 
 impl Quantity {
+    pub fn new(value: f32) -> Self {
+        Self { value }
+    }
+
     pub fn adjust(&mut self, delta: f32) {
         self.set_clamped(self.value + delta);
     }
@@ -56,6 +61,11 @@ impl Quantity {
             }
         }
         self.value = value.clamp(0.0, 1.0);
+    }
+
+    /// Value which should apply to gameplay effects.
+    pub fn effective_value(&self) -> f32 {
+        self.value
     }
 }
 
