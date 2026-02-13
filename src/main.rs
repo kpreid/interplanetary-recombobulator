@@ -341,18 +341,21 @@ fn setup_ui(
         assets.text_bar_fever_sprite.clone(),
         *fever,
         vec2(PLAYFIELD_RECT.min.x - 30.0, PLAYFIELD_RECT.min.y),
+        b::Color::srgb_u8(0xFF, 0x42, 0x42),
     ));
     commands.spawn(bar_bundle(
         &assets,
         assets.text_bar_coherence_sprite.clone(),
         *coherence,
         vec2(PLAYFIELD_RECT.max.x + 30.0, PLAYFIELD_RECT.min.y),
+        b::Color::srgb_u8(0xAA, 0xFF, 0x33),
     ));
     commands.spawn(bar_bundle(
         &assets,
         assets.text_bar_fervor_sprite.clone(),
         *fervor,
         vec2(PLAYFIELD_RECT.max.x + 70.0, PLAYFIELD_RECT.min.y),
+        b::Color::srgb_u8(0x55, 0xAA, 0xFF),
     ));
 }
 
@@ -362,6 +365,7 @@ fn bar_bundle(
     label: b::Handle<b::Image>,
     quantity_entity: b::Entity,
     position: Vec2,
+    tint: bevy::color::Color,
 ) -> impl b::Bundle {
     (
         b::children![
@@ -374,11 +378,14 @@ fn bar_bundle(
             (
                 b::Sprite {
                     image: assets.bar_fill_base_sprite.clone(),
+                    // TODO: this mode doesn’t do quite what we want when the size is *less* than
+                    // 1 repetition. Probably changes to bevy sprites would be needed to fix that.
                     image_mode: b::SpriteImageMode::Tiled {
                         tile_x: true,
                         tile_y: true,
                         stretch_value: 1.0,
                     },
+                    color: tint,
                     ..default()
                 },
                 b::Transform::from_translation(vec3(2.0, 0.0, Zees::UiBack.z())),
@@ -397,6 +404,7 @@ fn bar_bundle(
                         tile_y: true,
                         stretch_value: 1.0,
                     },
+                    color: tint,
                     ..default()
                 },
                 b::Transform::from_translation(vec3(2.0, 0.0, Zees::UiMiddle.z())),
