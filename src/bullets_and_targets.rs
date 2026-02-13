@@ -88,7 +88,7 @@ pub(crate) fn player_input_fire_gun(
 pub(crate) fn fire_gun_system(
     mut commands: b::Commands,
     gun_query: b::Query<(&b::Transform, &mut Gun, &Team, b::Has<Player>)>,
-    coherence_query: b::Single<&Quantity, (b::With<Coherence>, b::Without<Fever>)>,
+    mut coherence_query: b::Single<&mut Quantity, (b::With<Coherence>, b::Without<Fever>)>,
     mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
     assets: b::Res<crate::Preload>,
     images: b::Res<b::Assets<b::Image>>,
@@ -187,7 +187,12 @@ pub(crate) fn fire_gun_system(
         // Side effects of firing besides a bullet.
         gun.cooldown = gun.base_cooldown;
         if is_player {
+            // Shooting with high coherence adds temporary fever, which must be mitigated by not
+            // shooting too frequently
             fever_query.adjust_temporary_and_commit_previous_temporary(0.1 * coherence);
+
+            // Shooting decreases coherence, which must be mitigated by not missing
+            coherence_query.adjust_temporary_stacking_with_previous(-0.1);
         }
     }
 
@@ -210,10 +215,11 @@ pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
     bullet_query: b::Query<(&Team, &p::CollidingEntities, &mut Lifetime), b::With<Bullet>>,
     mut target_query: b::Query<(&Team, &mut Attackable, &b::Transform)>,
+    mut coherence_query: b::Single<&mut Quantity, b::With<Coherence>>,
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
-    for (bullet_team, collisions, mut bullet_lifetime) in bullet_query {
+    for (&bullet_team, collisions, mut bullet_lifetime) in bullet_query {
         // Note that a bullet may hit multiple targets and kill them if its collider
         // is large enough. This is on purpose to make high Coherence shots more effective.
 
@@ -281,6 +287,11 @@ pub(crate) fn bullet_hit_system(
             ));
 
             bullet_lifetime.0 = 0.0; // cause bullet to die on the next frame
+
+            // Player successfully hitting *something* cancels coherence loss.
+            if bullet_team == Team::Player {
+                coherence_query.adjust_permanent_ignoring_temporary(0.0);
+            }
         }
     }
     Ok(())

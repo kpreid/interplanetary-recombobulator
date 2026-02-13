@@ -78,6 +78,10 @@ impl Quantity {
         self.temporary_stack = delta;
     }
 
+    pub fn adjust_temporary_stacking_with_previous(&mut self, delta: f32) {
+        self.temporary_stack += delta;
+    }
+
     fn set_clamped(&mut self, value: f32) {
         if value.is_nan() {
             if cfg!(debug_assertions) {
@@ -92,7 +96,7 @@ impl Quantity {
 
     /// Value which should apply to gameplay effects.
     pub fn effective_value(&self) -> f32 {
-        self.base + self.temporary_stack
+        (self.base + self.temporary_stack).clamp(0.0, 1.0)
     }
 }
 
@@ -101,7 +105,7 @@ impl Quantity {
 #[expect(unused_variables)]
 pub(crate) fn quantity_behaviors_system(
     time: b::Res<b::Time>,
-    coherence: b::Single<
+    mut coherence: b::Single<
         &mut Quantity,
         (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
     >,
@@ -113,6 +117,11 @@ pub(crate) fn quantity_behaviors_system(
     mut next_state: b::ResMut<b::NextState<GameState>>,
 ) -> b::Result {
     // TODO: implement interactions between quantities
+
+    // Loss of coherence becomes permanent if not removed
+    let coherence_change = coherence.temporary_stack * (1.2f32.powf(time.delta_secs()) - 1.0);
+    coherence.base += coherence_change;
+    coherence.temporary_stack -= coherence_change;
 
     // Excess fever goes away if not committed
     fever.temporary_stack *= 0.3f32.powf(time.delta_secs());

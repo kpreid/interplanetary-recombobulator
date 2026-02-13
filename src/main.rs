@@ -20,7 +20,7 @@ use rand::RngExt as _;
 // -------------------------------------------------------------------------------------------------
 
 mod bullets_and_targets;
-use bullets_and_targets::{Bullet, Gun};
+use bullets_and_targets::Gun;
 
 mod enemy;
 
@@ -562,25 +562,15 @@ fn pause_unpause_observer(
 fn expire_lifetimes(
     mut commands: b::Commands,
     time: b::Res<b::Time>,
-    query: b::Query<(b::Entity, &mut Lifetime, Option<&Team>, b::Has<Bullet>)>,
-    mut coherence: b::Single<
-        &mut Quantity,
-        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
-    >,
+    query: b::Query<(b::Entity, &mut Lifetime)>,
 ) {
     let delta = time.delta_secs();
-    for (entity, mut lifetime, team, is_bullet) in query {
+    for (entity, mut lifetime) in query {
         let new_lifetime = lifetime.0 - delta;
         if new_lifetime > 0. {
             lifetime.0 = new_lifetime;
         } else {
             commands.entity(entity).despawn();
-
-            // If this is a bullet, then if it expired, it is a miss; lose coherence.
-            // TODO: use temporary loss that recovers if hit, instead
-            if is_bullet && team.copied() == Some(Team::Player) {
-                coherence.adjust_permanent_including_temporary(-0.01);
-            }
         }
     }
 }
