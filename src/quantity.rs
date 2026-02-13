@@ -46,7 +46,7 @@ pub(crate) enum UpdateProperty {
 
 // These constants are each the initial value of their corresponding `Quantity`
 impl Coherence {
-    pub const INITIAL: f32 = 1.0;
+    pub const INITIAL: f32 = 0.0;
 }
 impl Fever {
     pub const INITIAL: f32 = 0.5;
