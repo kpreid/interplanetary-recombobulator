@@ -1,8 +1,10 @@
 use avian2d::prelude::{self as p};
 use bevy::math::{Vec2, vec2};
 use bevy::prelude as b;
+use rand::seq::IndexedRandom;
 
 use crate::bullets_and_targets::Pattern;
+use crate::pickup::PickupSpawnType;
 use crate::{
     Gun, Lifetime, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Pickup, Preload, Team, Zees,
     bullets_and_targets::Attackable,
@@ -77,7 +79,12 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
         Attackable {
             health: 10,
             hurt_animation_cooldown: 0.0,
-            drops: true,
+            drops: Some(
+                [(PickupSpawnType::Cool, 1.0), (PickupSpawnType::Cohere, 0.2)]
+                    .choose_weighted(&mut rand::rng(), |&(_, weight)| weight)
+                    .unwrap()
+                    .0,
+            ),
         },
         Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
         EnemyShipAi,

@@ -21,20 +21,40 @@ pub(crate) enum Pickup {
     Cohere(f32),
 }
 
+/// Category of [`Pickup`] to spawn.
+/// Determines the exact value and appearance using its internal logic.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum PickupSpawnType {
+    Cool,
+    Cohere,
+}
+
 // -------------------------------------------------------------------------------------------------
 
-pub(crate) fn pickup_bundle(assets: &crate::Preload, position: Vec2) -> impl b::Bundle {
-    (
-        b::Sprite::from_image(assets.pickup_cool_sprite.clone()),
-        Pickup::Cool(0.1),
-        Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
-        b::Transform::from_translation(position.extend(Zees::Pickup.z())),
-        PLAYFIELD_LAYERS,
-        p::RigidBody::Kinematic,
-        p::Collider::circle(5.),
-        p::LinearVelocity(vec2(0.0, -70.0)),
-        p::AngularVelocity(0.6),
-    )
+impl PickupSpawnType {
+    pub(crate) fn pickup_bundle(&self, assets: &crate::Preload, position: Vec2) -> impl b::Bundle {
+        let image = match self {
+            PickupSpawnType::Cool => &assets.pickup_cool_sprite,
+            PickupSpawnType::Cohere => &assets.pickup_cohere_sprite,
+        };
+
+        let effect = match self {
+            PickupSpawnType::Cool => Pickup::Cool(0.1),
+            PickupSpawnType::Cohere => Pickup::Cohere(0.1),
+        };
+
+        (
+            b::Sprite::from_image(image.clone()),
+            effect,
+            Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
+            b::Transform::from_translation(position.extend(Zees::Pickup.z())),
+            PLAYFIELD_LAYERS,
+            p::RigidBody::Kinematic,
+            p::Collider::circle(5.),
+            p::LinearVelocity(vec2(0.0, -70.0)),
+            p::AngularVelocity(0.6),
+        )
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -75,7 +95,7 @@ pub(crate) fn pickup_system(
                 sound_asset = Some(assets.pickup_sound.clone());
             }
             Pickup::Cohere(amount) => {
-                coherence.adjust_permanent_ignoring_temporary(-amount);
+                coherence.adjust_permanent_ignoring_temporary(amount);
                 sound_asset = Some(assets.pickup_sound.clone());
             }
         }

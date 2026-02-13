@@ -7,7 +7,7 @@ use bevy::prelude as b;
 use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
 
-use crate::pickup::pickup_bundle;
+use crate::pickup::PickupSpawnType;
 use crate::{Coherence, Fever, Lifetime, PLAYFIELD_LAYERS, Player, Quantity, Shoot, Team, Zees};
 
 // -------------------------------------------------------------------------------------------------
@@ -27,8 +27,7 @@ pub(crate) struct Attackable {
     pub hurt_animation_cooldown: f32,
 
     /// If successfully killed, spawns beneficial [`crate::Pickup`]s.
-    /// (this may be more than a bool later)
-    pub drops: bool,
+    pub drops: Option<PickupSpawnType>,
 }
 
 /// This entity has a gun! It might be the player ship or an enemy ship.
@@ -250,11 +249,9 @@ pub(crate) fn bullet_hit_system(
                 commands.entity(colliding_entity).despawn();
 
                 // Spawn a pickup if we should
-                if attackable.drops {
-                    commands.spawn(pickup_bundle(
-                        &assets,
-                        attackable_transform.translation.xy(),
-                    ));
+                if let Some(drops) = attackable.drops.as_ref() {
+                    commands
+                        .spawn(drops.pickup_bundle(&assets, attackable_transform.translation.xy()));
                 }
             }
 

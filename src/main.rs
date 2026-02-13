@@ -234,6 +234,8 @@ struct Preload {
     // Pickups
     #[asset(path = "pickup-cool.png")]
     pickup_cool_sprite: b::Handle<b::Image>,
+    #[asset(path = "pickup-cohere.png")]
+    pickup_cohere_sprite: b::Handle<b::Image>,
     #[asset(path = "pickup.ogg")]
     pickup_sound: b::Handle<b::AudioSource>,
 
@@ -452,7 +454,7 @@ fn start_new_game(
             // any health below the max translates into fever increase via player_health_is_fever_system()
             health: u8::MAX,
             hurt_animation_cooldown: 0.0,
-            drops: false,
+            drops: None,
         },
         b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, Zees::Player.z()),
         b::Sprite::from_image(assets.player_ship_sprite.clone()),
