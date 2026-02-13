@@ -196,6 +196,8 @@ enum Pickup {
     Damage(f32),
     /// Decrease [`Fever`] by this amount.
     Cool(f32),
+    /// Increase [`Coherence`] by this amount.
+    Cohere(f32),
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, b::States)]
@@ -579,7 +581,14 @@ fn pickup_system(
     mut commands: b::Commands,
     player_query: b::Single<(&p::CollidingEntities, &mut Attackable), b::With<Player>>,
     pickups: b::Query<(&Pickup, &b::Transform)>,
-    mut fever: b::Single<&mut Quantity, b::With<Fever>>,
+    mut coherence: b::Single<
+        &mut Quantity,
+        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
+    >,
+    mut fever: b::Single<
+        &mut Quantity,
+        (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
+    >,
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let (player_collisions, mut player_attackable) = player_query.into_inner();
@@ -599,9 +608,12 @@ fn pickup_system(
 
                 sound_asset = Some(assets.enemy_hurt_sound.clone()); // TODO: separate player hurt 
             }
-            // TODO: additional damage SFX
             Pickup::Cool(amount) => {
                 fever.adjust_permanent_ignoring_temporary(-amount);
+                sound_asset = Some(assets.pickup_sound.clone());
+            }
+            Pickup::Cohere(amount) => {
+                coherence.adjust_permanent_ignoring_temporary(-amount);
                 sound_asset = Some(assets.pickup_sound.clone());
             }
         }
