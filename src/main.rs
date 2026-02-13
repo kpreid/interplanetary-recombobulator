@@ -24,13 +24,16 @@ use bullets_and_targets::Gun;
 
 mod enemy;
 
+mod pickup;
+use pickup::Pickup;
+
 mod rendering;
 use rendering::{PLAYFIELD_LAYERS, SCALING_MARGIN, UI_LAYERS, Zees};
 
 mod quantity;
 use quantity::{Coherence, Fervor, Fever, Quantity};
 
-use crate::bullets_and_targets::{Attackable, Pattern};
+use crate::bullets_and_targets::Pattern;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -107,7 +110,7 @@ fn main() {
             (
                 expire_lifetimes,
                 apply_movement,
-                pickup_system,
+                pickup::pickup_system,
                 bullets_and_targets::gun_cooldown,
                 enemy::enemy_ship_ai,
                 bullets_and_targets::fire_gun_system,
@@ -187,18 +190,6 @@ struct StarfieldSpawner {
 /// a value of zero is used to indicate that the
 #[derive(Debug, b::Component)]
 struct Lifetime(f32);
-
-/// On colliding with [`Player`], has an effect and despawns the entity.
-/// This is used for both pickups and colliding with enemies.
-#[derive(Debug, b::Component)]
-enum Pickup {
-    /// Increase [`Fever`] by this amount, and depict it as a damaging hit.
-    Damage(f32),
-    /// Decrease [`Fever`] by this amount.
-    Cool(f32),
-    /// Increase [`Coherence`] by this amount.
-    Cohere(f32),
-}
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, b::States)]
 enum GameState {
@@ -575,64 +566,6 @@ fn expire_lifetimes(
             commands.entity(entity).despawn();
         }
     }
-}
-
-fn pickup_system(
-    mut commands: b::Commands,
-    player_query: b::Single<(&p::CollidingEntities, &mut Attackable), b::With<Player>>,
-    pickups: b::Query<(&Pickup, &b::Transform)>,
-    mut coherence: b::Single<
-        &mut Quantity,
-        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
-    >,
-    mut fever: b::Single<
-        &mut Quantity,
-        (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
-    >,
-    assets: b::Res<crate::Preload>,
-) -> b::Result {
-    let (player_collisions, mut player_attackable) = player_query.into_inner();
-    for &pickup_entity in &player_collisions.0 {
-        let Ok((pickup, &pickup_transform)) = pickups.get(pickup_entity) else {
-            // not a pickup
-            continue;
-        };
-
-        let sound_asset;
-
-        match *pickup {
-            Pickup::Damage(amount) => {
-                fever.adjust_permanent_including_temporary(amount);
-
-                player_attackable.hurt_flash();
-
-                sound_asset = Some(assets.enemy_hurt_sound.clone()); // TODO: separate player hurt 
-            }
-            Pickup::Cool(amount) => {
-                fever.adjust_permanent_ignoring_temporary(-amount);
-                sound_asset = Some(assets.pickup_sound.clone());
-            }
-            Pickup::Cohere(amount) => {
-                coherence.adjust_permanent_ignoring_temporary(-amount);
-                sound_asset = Some(assets.pickup_sound.clone());
-            }
-        }
-
-        commands.entity(pickup_entity).despawn();
-
-        if let Some(sound_asset) = sound_asset {
-            commands.spawn((
-                b::AudioPlayer::new(sound_asset),
-                b::PlaybackSettings {
-                    spatial: true,
-                    volume: bevy::audio::Volume::Decibels(-10.),
-                    ..b::PlaybackSettings::DESPAWN
-                },
-                pickup_transform,
-            ));
-        }
-    }
-    Ok(())
 }
 
 // -------------------------------------------------------------------------------------------------

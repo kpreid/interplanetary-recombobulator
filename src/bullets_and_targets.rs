@@ -2,14 +2,13 @@ use std::f32::consts::PI;
 
 use avian2d::prelude as p;
 use bevy::ecs::entity::EntityHashSet;
-use bevy::math::{Vec2, vec2, vec3};
+use bevy::math::{Vec2, Vec3Swizzles as _, vec2, vec3};
 use bevy::prelude as b;
 use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
 
-use crate::{
-    Coherence, Fever, Lifetime, PLAYFIELD_LAYERS, Pickup, Player, Quantity, Shoot, Team, Zees,
-};
+use crate::pickup::pickup_bundle;
+use crate::{Coherence, Fever, Lifetime, PLAYFIELD_LAYERS, Player, Quantity, Shoot, Team, Zees};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -252,18 +251,9 @@ pub(crate) fn bullet_hit_system(
 
                 // Spawn a pickup if we should
                 if attackable.drops {
-                    commands.spawn((
-                        b::Sprite::from_image(assets.pickup_cool_sprite.clone()),
-                        Pickup::Cool(0.1),
-                        Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
-                        b::Transform::from_translation(
-                            attackable_transform.translation.with_z(Zees::Pickup.z()),
-                        ),
-                        PLAYFIELD_LAYERS,
-                        p::RigidBody::Kinematic,
-                        p::Collider::circle(5.),
-                        p::LinearVelocity(vec2(0.0, -70.0)),
-                        p::AngularVelocity(0.6),
+                    commands.spawn(pickup_bundle(
+                        &assets,
+                        attackable_transform.translation.xy(),
                     ));
                 }
             }
