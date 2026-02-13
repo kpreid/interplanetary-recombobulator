@@ -52,7 +52,7 @@ impl Fever {
     pub const INITIAL: f32 = 0.5;
 }
 impl Fervor {
-    pub const INITIAL: f32 = 0.0;
+    pub const INITIAL: f32 = 0.5;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -66,15 +66,19 @@ impl Quantity {
     }
 
     pub fn adjust_permanent_including_temporary(&mut self, delta: f32) {
-        self.set_clamped(self.effective_value() + delta);
+        self.reset_to(self.effective_value() + delta);
     }
 
-    pub fn adjust_permanent_ignoring_temporary(&mut self, delta: f32) {
-        self.set_clamped(self.base + delta);
+    pub fn adjust_permanent_clearing_temporary(&mut self, delta: f32) {
+        self.reset_to(self.base + delta);
+    }
+
+    pub fn adjust_permanent_keeping_temporary(&mut self, delta: f32) {
+        self.set_base_only(self.base + delta);
     }
 
     pub fn adjust_temporary_and_commit_previous_temporary(&mut self, delta: f32) {
-        self.set_clamped(self.effective_value());
+        self.reset_to(self.effective_value());
         self.temporary_stack = delta;
     }
 
@@ -82,7 +86,13 @@ impl Quantity {
         self.temporary_stack += delta;
     }
 
-    fn set_clamped(&mut self, value: f32) {
+    /// Set the value and erase any temporary modifications
+    pub fn reset_to(&mut self, value: f32) {
+        self.set_base_only(value);
+        self.temporary_stack = 0.0;
+    }
+
+    fn set_base_only(&mut self, value: f32) {
         if value.is_nan() {
             if cfg!(debug_assertions) {
                 panic!("NaN value");
@@ -91,7 +101,6 @@ impl Quantity {
             }
         }
         self.base = value.clamp(0.0, 1.0);
-        self.temporary_stack = 0.0;
     }
 
     /// Value which should apply to gameplay effects.
@@ -112,20 +121,14 @@ pub(crate) fn quantity_behaviors_system(
         &mut Quantity,
         (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
     >,
-    fervor: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
+    mut fervor: b::Single<
+        &mut Quantity,
+        (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
+    >,
     mut next_state: b::ResMut<b::NextState<GameState>>,
     mut next_wog_state: b::ResMut<b::NextState<WinOrGameOver>>,
 ) -> b::Result {
-    // TODO: implement interactions between quantities
-
-    // Loss of coherence becomes permanent if not removed
-    let coherence_change = coherence.temporary_stack * (1.2f32.powf(time.delta_secs()) - 1.0);
-    coherence.base += coherence_change;
-    coherence.temporary_stack -= coherence_change;
-
-    // Excess fever goes away if not committed
-    fever.temporary_stack *= 0.3f32.powf(time.delta_secs());
-
+    // Win and lose conditions
     if fever.effective_value() == 1.0 {
         next_state.set_if_neq(GameState::WinOrGameOver);
         next_wog_state.set(WinOrGameOver::GameOver);
@@ -133,6 +136,25 @@ pub(crate) fn quantity_behaviors_system(
         next_state.set_if_neq(GameState::WinOrGameOver);
         next_wog_state.set(WinOrGameOver::Win);
     }
+
+    // Loss of coherence becomes permanent if not removed
+    {
+        let coherence_change = coherence.temporary_stack * (1.2f32.powf(time.delta_secs()) - 1.0);
+        coherence.base += coherence_change;
+        coherence.temporary_stack -= coherence_change;
+    }
+
+    // Excess fever goes away if not committed
+    fever.temporary_stack *= 0.3f32.powf(time.delta_secs());
+
+    // Fervor always goes down no matter what and is harder to maintain the higher it is
+    {
+        let fervor_decay = fervor.effective_value() * (0.95f32.powf(time.delta_secs()) - 1.0);
+        fervor.adjust_permanent_keeping_temporary(fervor_decay);
+    }
+
+    // Temporary fervor goes down even faster
+    fervor.temporary_stack *= 0.3f32.powf(time.delta_secs());
 
     Ok(())
 }

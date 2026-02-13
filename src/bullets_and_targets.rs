@@ -267,7 +267,7 @@ pub(crate) fn bullet_hit_system(
                 if bullet_team == Team::Player
                     && coherence_query.effective_value() > fever_query.effective_value()
                 {
-                    fervor_query.adjust_temporary_and_commit_previous_temporary(0.5);
+                    fervor_query.adjust_temporary_and_commit_previous_temporary(0.1);
                 }
             }
 
@@ -293,7 +293,7 @@ pub(crate) fn bullet_hit_system(
 
             // Player successfully hitting *something* cancels coherence loss.
             if bullet_team == Team::Player {
-                coherence_query.adjust_permanent_ignoring_temporary(0.0);
+                coherence_query.adjust_permanent_clearing_temporary(0.0);
             }
         }
     }
@@ -321,13 +321,17 @@ pub(crate) fn player_health_is_fever_system(
     // Note that this query matches `Player` and not everything on `Team::Player`.
     // This doesn't matter now but we could imagine having drones or something.
     player_query: b::Query<&mut Attackable, b::With<Player>>,
-    mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
+    mut fever_query: b::Single<&mut Quantity, (b::With<Fever>, b::Without<Fervor>)>,
+    mut fervor_query: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Fever>)>,
 ) {
     for mut attackable in player_query {
         let damage = u8::MAX - attackable.health;
         if damage > 0 {
             attackable.health = u8::MAX;
             fever_query.adjust_permanent_including_temporary(damage as f32 * 0.1);
+
+            // Taking any damage also resets fervor
+            fervor_query.reset_to(0.0);
         }
     }
 }

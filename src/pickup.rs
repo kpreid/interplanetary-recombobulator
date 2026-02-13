@@ -91,11 +91,11 @@ pub(crate) fn pickup_system(
                 sound_asset = Some(assets.enemy_hurt_sound.clone()); // TODO: separate player hurt 
             }
             Pickup::Cool(amount) => {
-                fever.adjust_permanent_ignoring_temporary(-amount);
+                fever.adjust_permanent_clearing_temporary(-amount);
                 sound_asset = Some(assets.pickup_sound.clone());
             }
             Pickup::Cohere(amount) => {
-                coherence.adjust_permanent_ignoring_temporary(amount);
+                coherence.adjust_permanent_clearing_temporary(amount);
                 sound_asset = Some(assets.pickup_sound.clone());
             }
         }
