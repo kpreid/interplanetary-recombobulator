@@ -8,7 +8,9 @@ use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
 
 use crate::pickup::PickupSpawnType;
-use crate::{Coherence, Fever, Lifetime, PLAYFIELD_LAYERS, Player, Quantity, Shoot, Team, Zees};
+use crate::{
+    Coherence, Fervor, Fever, Lifetime, PLAYFIELD_LAYERS, Player, Quantity, Shoot, Team, Zees,
+};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -213,7 +215,15 @@ pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
     bullet_query: b::Query<(&Team, &p::CollidingEntities, &mut Lifetime), b::With<Bullet>>,
     mut target_query: b::Query<(&Team, &mut Attackable, &b::Transform)>,
-    mut coherence_query: b::Single<&mut Quantity, b::With<Coherence>>,
+    fever_query: b::Single<&Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
+    mut coherence_query: b::Single<
+        &mut Quantity,
+        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
+    >,
+    mut fervor_query: b::Single<
+        &mut Quantity,
+        (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
+    >,
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
@@ -252,6 +262,12 @@ pub(crate) fn bullet_hit_system(
                 if let Some(drops) = attackable.drops.as_ref() {
                     commands
                         .spawn(drops.pickup_bundle(&assets, attackable_transform.translation.xy()));
+                }
+
+                if bullet_team == Team::Player
+                    && coherence_query.effective_value() > fever_query.effective_value()
+                {
+                    fervor_query.adjust_temporary_and_commit_previous_temporary(0.5);
                 }
             }
 
