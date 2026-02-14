@@ -2,12 +2,12 @@ use std::f32::consts::PI;
 
 use avian2d::prelude as p;
 use bevy::ecs::entity::EntityHashSet;
-use bevy::math::{Vec2, Vec3Swizzles as _, vec2, vec3};
+use bevy::math::{Vec2, vec2, vec3};
 use bevy::prelude as b;
 use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
 
-use crate::pickup::{Pickup, PickupSpawnType};
+use crate::pickup::Pickup;
 use crate::{
     Coherence, Fervor, Fever, Lifetime, PLAYFIELD_LAYERS, Player, Quantity, Shoot, Team, Zees,
 };
