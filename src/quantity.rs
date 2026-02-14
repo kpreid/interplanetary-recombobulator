@@ -36,12 +36,18 @@ pub(crate) struct Fervor;
 pub(crate) struct UpdateFromQuantity {
     pub quantity_entity: b::Entity,
     pub property: UpdateProperty,
+    pub effect: UpdateEffect,
 }
 
 #[derive(Debug)]
 pub(crate) enum UpdateProperty {
-    BaseValueToLength,
-    TemporaryValueToLength,
+    BaseValue,
+    TemporaryValue,
+}
+#[derive(Debug)]
+pub(crate) enum UpdateEffect {
+    BarLength,
+    Opacity,
 }
 
 // These constants are each the initial value of their corresponding `Quantity`
@@ -174,20 +180,28 @@ pub(crate) fn update_quantity_display_system_1(
     Ok(())
 }
 
-/// Updates bars for all quantities uniformly
+/// Updates sprites from quantities as specified by [`UpdateFromQuantity`] components.
+/// The main job of this system is to update the bars.
 pub(crate) fn update_quantity_display_system_2(
     quantities: b::Query<&Quantity>,
-    bars_to_update: b::Query<(&mut b::Sprite, &UpdateFromQuantity)>,
+    sprites_to_update: b::Query<(&mut b::Sprite, &UpdateFromQuantity)>,
 ) -> b::Result {
-    let length_scale = 459.0;
-    let width = 16.0;
-    for (mut sprite, ufq) in bars_to_update {
+    for (mut sprite, ufq) in sprites_to_update {
         let quantity: &Quantity = quantities.get(ufq.quantity_entity)?;
         let value = match ufq.property {
-            UpdateProperty::BaseValueToLength => quantity.base,
-            UpdateProperty::TemporaryValueToLength => quantity.effective_value(),
+            UpdateProperty::BaseValue => quantity.base,
+            UpdateProperty::TemporaryValue => quantity.effective_value(),
         };
-        sprite.custom_size = Some(vec2(length_scale * value, width));
+        match ufq.effect {
+            UpdateEffect::BarLength => {
+                let length_scale = 459.0;
+                let width = 16.0;
+                sprite.custom_size = Some(vec2(length_scale * value, width));
+            }
+            UpdateEffect::Opacity => {
+                sprite.color = b::Color::LinearRgba(b::LinearRgba::new(1.0, 1.0, 1.0, value));
+            }
+        }
     }
     Ok(())
 }

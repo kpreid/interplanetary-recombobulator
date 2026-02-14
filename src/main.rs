@@ -35,6 +35,7 @@ mod quantity;
 use quantity::{Coherence, Fervor, Fever, Quantity};
 
 use crate::bullets_and_targets::Pattern;
+use crate::quantity::UpdateFromQuantity;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -225,7 +226,7 @@ struct StatusText;
 #[derive(b::Resource, bevy_asset_loader::asset_collection::AssetCollection)]
 struct Preload {
     // Enemy assets
-    #[asset(path = "player.png")] // TODO: enemy sprite
+    #[asset(path = "enemy.png")]
     enemy_sprite: b::Handle<b::Image>,
     #[asset(path = "enemy-bullet.png")]
     enemy_bullet_sprite: b::Handle<b::Image>,
@@ -235,8 +236,10 @@ struct Preload {
     enemy_kill_sound: b::Handle<b::AudioSource>,
 
     // Player assets
-    #[asset(path = "player.png")]
+    #[asset(path = "player-ship.png")]
     player_ship_sprite: b::Handle<b::Image>,
+    #[asset(path = "player-ship-heat.png")]
+    player_ship_heat_sprite: b::Handle<b::Image>,
     #[asset(path = "player-bullet.png")]
     player_bullet_sprite: b::Handle<b::Image>,
     #[asset(path = "shoot.ogg")]
@@ -392,7 +395,8 @@ fn bar_bundle(
                 bevy::sprite::Anchor::CENTER_LEFT,
                 quantity::UpdateFromQuantity {
                     quantity_entity,
-                    property: quantity::UpdateProperty::BaseValueToLength,
+                    property: quantity::UpdateProperty::BaseValue,
+                    effect: quantity::UpdateEffect::BarLength,
                 },
                 UI_LAYERS,
             ),
@@ -411,7 +415,8 @@ fn bar_bundle(
                 bevy::sprite::Anchor::CENTER_LEFT,
                 quantity::UpdateFromQuantity {
                     quantity_entity,
-                    property: quantity::UpdateProperty::TemporaryValueToLength,
+                    property: quantity::UpdateProperty::TemporaryValue,
+                    effect: quantity::UpdateEffect::BarLength,
                 },
                 UI_LAYERS,
             ),
@@ -453,8 +458,8 @@ fn start_new_game(
         &mut Quantity,
         (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
     >,
-    mut fever: b::Single<
-        &mut Quantity,
+    fever_query: b::Single<
+        (b::Entity, &mut Quantity),
         (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
     >,
     mut fervor: b::Single<
@@ -462,8 +467,9 @@ fn start_new_game(
         (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
     >,
 ) {
+    let (fever_q_entity, mut fever) = fever_query.into_inner();
     **coherence = Quantity::new(Coherence::INITIAL);
-    **fever = Quantity::new(Fever::INITIAL);
+    *fever = Quantity::new(Fever::INITIAL);
     **fervor = Quantity::new(Fervor::INITIAL);
 
     commands.spawn((
@@ -475,9 +481,9 @@ fn start_new_game(
             hurt_animation_cooldown: 0.0,
             drops: None,
         },
-        b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, Zees::Player.z()),
-        b::Sprite::from_image(assets.player_ship_sprite.clone()),
+        b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, 0.0),
         PLAYFIELD_LAYERS,
+        b::Visibility::Visible,
         bei::actions!(Player[
             (
                 bei::Action::<Move>::new(),
@@ -500,6 +506,21 @@ fn start_new_game(
             trigger: false,
             pattern: Pattern::Coherent,
         },
+        b::children![
+            (
+                b::Sprite::from_image(assets.player_ship_sprite.clone()),
+                b::Transform::from_xyz(0., 0., Zees::Player.z()),
+            ),
+            (
+                b::Sprite::from_image(assets.player_ship_heat_sprite.clone()),
+                b::Transform::from_xyz(0., 0., Zees::AbovePlayer.z()),
+                UpdateFromQuantity {
+                    quantity_entity: fever_q_entity,
+                    property: quantity::UpdateProperty::TemporaryValue,
+                    effect: quantity::UpdateEffect::Opacity,
+                },
+            )
+        ],
     ));
 
     commands.spawn(enemy::EnemySpawner {
