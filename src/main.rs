@@ -222,6 +222,10 @@ enum WinOrGameOver {
 #[derive(Debug, b::Component)]
 struct StatusText;
 
+/// Entity that is the parent of all entities making up a given Quantity's bar display
+#[derive(Debug, b::Component)]
+struct BarParent<T>(T);
+
 /// Assets that we use for things spawned after startup.
 #[derive(b::Resource, bevy_asset_loader::asset_collection::AssetCollection)]
 struct Preload {
@@ -340,6 +344,7 @@ fn setup_ui(
     ));
 
     commands.spawn(bar_bundle(
+        Fever,
         &assets,
         assets.text_bar_fever_sprite.clone(),
         *fever,
@@ -347,6 +352,7 @@ fn setup_ui(
         b::Color::srgb_u8(0xFF, 0x42, 0x42),
     ));
     commands.spawn(bar_bundle(
+        Coherence,
         &assets,
         assets.text_bar_coherence_sprite.clone(),
         *coherence,
@@ -354,6 +360,7 @@ fn setup_ui(
         b::Color::srgb_u8(0xAA, 0xFF, 0x33),
     ));
     commands.spawn(bar_bundle(
+        Fervor,
         &assets,
         assets.text_bar_fervor_sprite.clone(),
         *fervor,
@@ -363,7 +370,8 @@ fn setup_ui(
 }
 
 /// Build the UI for a [`Quantity`] bar
-fn bar_bundle(
+fn bar_bundle<Marker: Send + Sync + 'static>(
+    marker: Marker,
     assets: &Preload,
     label: b::Handle<b::Image>,
     quantity_entity: b::Entity,
@@ -371,6 +379,7 @@ fn bar_bundle(
     tint: bevy::color::Color,
 ) -> impl b::Bundle {
     (
+        BarParent(marker),
         b::children![
             (
                 b::Sprite::from_image(assets.bar_frame_sprite.clone()),
@@ -429,7 +438,12 @@ fn bar_bundle(
                 UI_LAYERS,
             )
         ],
-        b::Visibility::default(), // needed for hierarchy https://bevy.org/learn/errors/b0004/
+        b::Visibility::Hidden,
+        quantity::UpdateFromQuantity {
+            quantity_entity,
+            property: quantity::UpdateProperty::TemporaryValue,
+            effect: quantity::UpdateEffect::VisibleIfEverNotZero,
+        },
         b::Transform {
             translation: position.extend(0.0),
             rotation: b::Quat::from_rotation_z(PI / 2.),
@@ -466,11 +480,21 @@ fn start_new_game(
         &mut Quantity,
         (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
     >,
+
+    bars_to_hide: b::Query<
+        &mut b::Visibility,
+        b::Or<(b::With<BarParent<Coherence>>, b::With<BarParent<Fervor>>)>,
+    >,
 ) {
     let (fever_q_entity, mut fever) = fever_query.into_inner();
     **coherence = Quantity::new(Coherence::INITIAL);
     *fever = Quantity::new(Fever::INITIAL);
     **fervor = Quantity::new(Fervor::INITIAL);
+
+    // Reset sticky visibility of bars
+    for mut bar_vis in bars_to_hide {
+        *bar_vis = b::Visibility::Hidden;
+    }
 
     commands.spawn((
         Player,

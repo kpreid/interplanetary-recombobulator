@@ -1,3 +1,4 @@
+use bevy::ecs::change_detection::DetectChangesMut;
 use bevy::math::vec2;
 use bevy::prelude as b;
 
@@ -48,6 +49,7 @@ pub(crate) enum UpdateProperty {
 pub(crate) enum UpdateEffect {
     BarLength,
     Opacity,
+    VisibleIfEverNotZero,
 }
 
 // These constants are each the initial value of their corresponding `Quantity`
@@ -58,7 +60,7 @@ impl Fever {
     pub const INITIAL: f32 = 0.5;
 }
 impl Fervor {
-    pub const INITIAL: f32 = 0.5;
+    pub const INITIAL: f32 = 0.0;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -136,10 +138,10 @@ pub(crate) fn quantity_behaviors_system(
 ) -> b::Result {
     // Win and lose conditions
     if fever.effective_value() == 1.0 {
-        next_state.set_if_neq(GameState::WinOrGameOver);
+        (*next_state).set_if_neq(GameState::WinOrGameOver);
         next_wog_state.set(WinOrGameOver::GameOver);
     } else if fervor.effective_value() >= 0.99 {
-        next_state.set_if_neq(GameState::WinOrGameOver);
+        (*next_state).set_if_neq(GameState::WinOrGameOver);
         next_wog_state.set(WinOrGameOver::Win);
     }
 
@@ -184,9 +186,13 @@ pub(crate) fn update_quantity_display_system_1(
 /// The main job of this system is to update the bars.
 pub(crate) fn update_quantity_display_system_2(
     quantities: b::Query<&Quantity>,
-    sprites_to_update: b::Query<(&mut b::Sprite, &UpdateFromQuantity)>,
+    sprites_to_update: b::Query<(
+        Option<&mut b::Sprite>,
+        Option<&mut b::Visibility>,
+        &UpdateFromQuantity,
+    )>,
 ) -> b::Result {
-    for (mut sprite, ufq) in sprites_to_update {
+    for (sprite, visibility, ufq) in sprites_to_update {
         let quantity: &Quantity = quantities.get(ufq.quantity_entity)?;
         let value = match ufq.property {
             UpdateProperty::BaseValue => quantity.base,
@@ -196,10 +202,20 @@ pub(crate) fn update_quantity_display_system_2(
             UpdateEffect::BarLength => {
                 let length_scale = 459.0;
                 let width = 16.0;
-                sprite.custom_size = Some(vec2(length_scale * value, width));
+                sprite
+                    .expect("need sprite component for BarLength")
+                    .custom_size = Some(vec2(length_scale * value, width));
             }
             UpdateEffect::Opacity => {
-                sprite.color = b::Color::LinearRgba(b::LinearRgba::new(1.0, 1.0, 1.0, value));
+                sprite.expect("need sprite component for Opacity").color =
+                    b::Color::LinearRgba(b::LinearRgba::new(1.0, 1.0, 1.0, value));
+            }
+            UpdateEffect::VisibleIfEverNotZero => {
+                let mut visibility =
+                    visibility.expect("need visibility component for VisibleIfNotZero");
+                if value > 0.0 {
+                    visibility.set_if_neq(b::Visibility::Visible);
+                }
             }
         }
     }
