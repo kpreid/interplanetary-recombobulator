@@ -4,6 +4,7 @@ use std::f32::consts::PI;
 
 use avian2d::prelude::{self as p, PhysicsTime as _};
 use bevy::app::PluginGroup as _;
+use bevy::ecs::change_detection::{DetectChanges, DetectChangesMut as _};
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3, Vec3Swizzles as _, ivec2, vec2, vec3};
@@ -74,12 +75,13 @@ fn main() {
         .add_sub_state::<WinOrGameOver>()
         .add_loading_state(
             bevy_asset_loader::loading_state::LoadingState::new(GameState::AssetLoading)
-                .continue_to_state(GameState::NotStarted)
+                .continue_to_state(GameState::Menu)
                 .load_collection::<Preload>(),
         )
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
         .add_input_context::<Player>()
         .add_input_context::<NonGameInput>()
+        .init_resource::<bevy::input_focus::InputFocus>()
         .add_plugins(avian2d::PhysicsPlugins::default())
         //.add_plugins(avian2d::prelude::PhysicsDebugPlugin::default())
         .add_systems(
@@ -92,16 +94,19 @@ fn main() {
             ),
         )
         .add_systems(b::OnExit(GameState::AssetLoading), setup_ui)
-        .add_systems(b::OnExit(GameState::NotStarted), start_new_game)
+        .add_systems(b::OnExit(GameState::Menu), start_new_game)
         .add_systems(b::OnExit(GameState::WinOrGameOver), despawn_game)
         .add_systems(b::OnEnter(GameState::Playing), unpause)
         .add_systems(b::OnExit(GameState::Playing), pause)
         .add_observer(pause_unpause_observer)
         .add_systems(
             b::Update,
+            // UI systems
             (
                 rendering::fit_canvas_to_window_system,
                 update_status_text_system,
+                button_system,
+                set_ui_visibility_from_state,
             ),
         )
         .add_systems(
@@ -200,7 +205,7 @@ enum GameState {
     AssetLoading,
 
     /// Game not started. Game entities do not exist.
-    NotStarted,
+    Menu,
 
     Playing,
 
@@ -221,6 +226,15 @@ enum WinOrGameOver {
 
 #[derive(Debug, b::Component)]
 struct StatusText;
+
+#[derive(Debug, b::Component)]
+enum ButtonAction {
+    NewGame,
+    Menu,
+}
+
+#[derive(Debug, b::Component)]
+struct VisibleInState(GameState);
 
 /// Entity that is the parent of all entities making up a given Quantity's bar display
 #[derive(Debug, b::Component)]
@@ -324,7 +338,7 @@ fn setup_status_text(mut commands: b::Commands) {
         },
         b::TextLayout::new_with_justify(b::Justify::Center),
         bevy::sprite::Anchor::CENTER,
-        b::Transform::from_translation(vec3(0.0, 20.0, 0.0)),
+        b::Transform::from_translation(vec3(0.0, 100.0, 0.0)),
         UI_LAYERS,
     ));
 }
@@ -367,6 +381,63 @@ fn setup_ui(
         vec2(PLAYFIELD_RECT.max.x + 70.0, PLAYFIELD_RECT.min.y),
         b::Color::srgb_u8(0x55, 0xAA, 0xFF),
     ));
+
+    // New Game button
+    commands.spawn((
+        b::Node {
+            width: b::percent(100),
+            height: b::percent(100),
+            align_items: b::AlignItems::Center,
+            justify_content: b::JustifyContent::Center,
+            ..default()
+        },
+        VisibleInState(GameState::Menu),
+        b::children![button_bundle("New Game", ButtonAction::NewGame)],
+    ));
+
+    // Back to Menu button for Game Over
+    commands.spawn((
+        b::Node {
+            width: b::percent(100),
+            height: b::percent(100),
+            align_items: b::AlignItems::Center,
+            justify_content: b::JustifyContent::Center,
+            ..default()
+        },
+        VisibleInState(GameState::WinOrGameOver),
+        b::children![button_bundle("Menu", ButtonAction::Menu)],
+    ));
+}
+
+fn button_bundle(label: &str, action: ButtonAction) -> impl b::Bundle {
+    (
+        b::Button,
+        b::Node {
+            width: b::px(150),
+            height: b::px(65),
+            border: b::UiRect::all(b::px(5)),
+            justify_content: b::JustifyContent::Center,
+            align_items: b::AlignItems::Center,
+            border_radius: b::BorderRadius::MAX,
+            ..default()
+        },
+        action,
+        b::BorderColor::all(b::Color::WHITE),
+        b::BackgroundColor(NORMAL_BUTTON),
+        b::children![(
+            b::Text::new(label),
+            // TextFont {
+            //     font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+            //     font_size: 33.0,
+            //     ..default()
+            // },
+            b::TextColor(b::Color::srgb(0.9, 0.9, 0.9)),
+            b::TextShadow {
+                offset: vec2(1.0, 1.0),
+                color: b::Color::BLACK
+            },
+        )],
+    )
 }
 
 /// Build the UI for a [`Quantity`] bar
@@ -607,11 +678,11 @@ fn pause_unpause_observer(
     mut next_state: b::ResMut<b::NextState<GameState>>,
 ) {
     bevy::log::info!("pause_unpause");
-    next_state.set_if_neq(match *state.get() {
+    (*next_state).set_if_neq(match *state.get() {
         GameState::AssetLoading => return,
         GameState::Playing => GameState::Paused,
-        GameState::Paused | GameState::NotStarted => GameState::Playing,
-        GameState::WinOrGameOver => GameState::NotStarted,
+        GameState::Paused | GameState::Menu => GameState::Playing,
+        GameState::WinOrGameOver => GameState::Menu,
     });
 }
 
@@ -699,7 +770,7 @@ fn update_status_text_system(
 ) {
     let new_text = match *state.get() {
         GameState::AssetLoading => "Loading",
-        GameState::NotStarted => "Ready", // TODO: make this blank once we have other menu UI
+        GameState::Menu => "Ready", // TODO: make this blank once we have other menu UI
         GameState::WinOrGameOver => match *wog_state.unwrap().get() {
             WinOrGameOver::GameOver => "Game Overheated",
             WinOrGameOver::Win => "Win",
@@ -711,5 +782,76 @@ fn update_status_text_system(
     if ***text != new_text {
         text.clear();
         text.push_str(new_text);
+    }
+}
+
+// based off of https://bevy.org/examples/ui-user-interface/button/
+const NORMAL_BUTTON: b::Color = b::Color::srgb(0.15, 0.15, 0.15);
+const HOVERED_BUTTON: b::Color = b::Color::srgb(0.5, 0.25, 0.25);
+const PRESSED_BUTTON: b::Color = b::Color::srgb(0.75, 0.75, 0.35);
+
+/// based off of https://bevy.org/examples/ui-user-interface/button/
+fn button_system(
+    //mut commands: b::Commands,
+    mut input_focus: b::ResMut<bevy::input_focus::InputFocus>,
+    mut interaction_query: b::Query<
+        (
+            b::Entity,
+            Option<&ButtonAction>,
+            &b::Interaction,
+            &mut b::BackgroundColor,
+            &mut b::Button,
+        ),
+        b::Changed<b::Interaction>,
+    >,
+    // state: b::Res<b::State<GameState>>,
+    mut next_state: b::ResMut<b::NextState<GameState>>,
+) {
+    for (entity, action, interaction, mut color, mut button) in &mut interaction_query {
+        match *interaction {
+            b::Interaction::Pressed => {
+                input_focus.set(entity);
+                *color = PRESSED_BUTTON.into();
+                button.set_changed();
+
+                // TODO: would be better if this went through the same kind of path as key bindings
+                match action {
+                    Some(ButtonAction::NewGame) => {
+                        next_state.set(GameState::Playing);
+                    }
+                    Some(ButtonAction::Menu) => {
+                        next_state.set(GameState::Menu);
+                    }
+                    None => b::warn!("Button {entity:?} has no action"),
+                }
+            }
+            b::Interaction::Hovered => {
+                input_focus.set(entity);
+                *color = HOVERED_BUTTON.into();
+                button.set_changed();
+            }
+            b::Interaction::None => {
+                input_focus.clear();
+                *color = NORMAL_BUTTON.into();
+                button.set_changed();
+            }
+        }
+    }
+}
+
+fn set_ui_visibility_from_state(
+    entities: b::Query<(&mut b::Visibility, &VisibleInState)>,
+    state: b::Res<b::State<GameState>>,
+) {
+    if !state.is_changed() {
+        return;
+    }
+    // currently, just hides all buttons only in the new game state
+    for (mut visibility, expected_state) in entities {
+        *visibility = if expected_state.0 == **state {
+            b::Visibility::Inherited
+        } else {
+            b::Visibility::Hidden
+        };
     }
 }
