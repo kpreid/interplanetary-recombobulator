@@ -17,7 +17,9 @@ use crate::{
 /// Entity is a bullet and does bullet things such as hurting enemies.
 #[derive(Debug, b::Component)]
 #[require(p::CollidingEntities)]
-pub(crate) struct Bullet;
+pub(crate) struct Bullet {
+    damage: u8,
+}
 
 /// Something that dies if shot.
 #[derive(Debug, b::Component)]
@@ -115,7 +117,7 @@ pub(crate) fn fire_gun_system(
         };
 
         let base_bullet_speed = 400.0 + coherence.powi(2) * 20000.0;
-        let bullet_angle_step_rad = (1.0 - coherence) * 5f32.to_radians();
+        let bullet_angle_step_rad = (1.0 - coherence * 0.9) * 5f32.to_radians();
         // bullets scaled so that they overlap themselves from frame to frame,
         // for both reliable collisions and for good visuals.
         let bullet_scale = vec2(1.0, (base_bullet_speed * 0.003).max(1.0));
@@ -136,7 +138,13 @@ pub(crate) fn fire_gun_system(
                 * b::Transform::from_scale(bullet_scale.extend(1.0));
 
             commands.spawn((
-                Bullet,
+                Bullet {
+                    damage: match gun.pattern {
+                        Pattern::Single => 1,
+                        // if coherence is high, add bonus damage
+                        Pattern::Coherent => 1 + (coherence * 2.9).floor() as u8,
+                    },
+                },
                 team,
                 Lifetime(0.4),
                 b::Sprite::from_image(
@@ -213,7 +221,7 @@ pub(crate) fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
 
 pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
-    bullet_query: b::Query<(&Team, &p::CollidingEntities, &mut Lifetime), b::With<Bullet>>,
+    bullet_query: b::Query<(&Bullet, &Team, &p::CollidingEntities, &mut Lifetime)>,
     mut target_query: b::Query<(&Team, &mut Attackable, &b::Transform)>,
     fever_query: b::Single<&Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     mut coherence_query: b::Single<
@@ -227,7 +235,7 @@ pub(crate) fn bullet_hit_system(
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
-    for (&bullet_team, collisions, mut bullet_lifetime) in bullet_query {
+    for (bullet, &bullet_team, collisions, mut bullet_lifetime) in bullet_query {
         // Note that a bullet may hit multiple targets and kill them if its collider
         // is large enough. This is on purpose to make high Coherence shots more effective.
 
@@ -248,7 +256,7 @@ pub(crate) fn bullet_hit_system(
                 continue 'colliding;
             }
 
-            let new_health = attackable.health.saturating_sub(1);
+            let new_health = attackable.health.saturating_sub(bullet.damage);
             let is_killed = new_health == 0;
 
             if !is_killed {
