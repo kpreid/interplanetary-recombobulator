@@ -74,17 +74,16 @@ pub(crate) fn spawn_enemies_system(
 }
 
 fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
+    let pickup = [(PickupSpawnType::Cool, 1.0), (PickupSpawnType::Cohere, 0.2)]
+        .choose_weighted(&mut rand::rng(), |&(_, weight)| weight)
+        .unwrap()
+        .0
+        .pickup_bundle(assets, vec2(0., 0.));
     (
         Team::Enemy,
         Attackable {
             health: 10,
             hurt_animation_cooldown: 0.0,
-            drops: Some(
-                [(PickupSpawnType::Cool, 1.0), (PickupSpawnType::Cohere, 0.2)]
-                    .choose_weighted(&mut rand::rng(), |&(_, weight)| weight)
-                    .unwrap()
-                    .0,
-            ),
         },
         Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
         EnemyShipAi,
@@ -104,6 +103,7 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
             trigger: false,
             pattern: Pattern::Single,
         },
+        b::children![pickup],
     )
 }
 

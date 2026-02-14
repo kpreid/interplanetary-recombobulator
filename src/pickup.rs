@@ -43,18 +43,28 @@ impl PickupSpawnType {
             PickupSpawnType::Cohere => Pickup::Cohere(0.1),
         };
 
+        // This bundle contains the parts of the pickup that exist while it is being carried
+        // by an enemy. The parts for its independent existence will be added when it drops
+        // from the enemy by after_drop_bundle().
         (
             b::Sprite::from_image(image.clone()),
             effect,
-            Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
             b::Transform::from_translation(position.extend(Zees::Pickup.z())),
             PLAYFIELD_LAYERS,
-            p::RigidBody::Kinematic,
-            p::Collider::circle(5.),
-            p::LinearVelocity(vec2(0.0, -70.0)),
-            p::AngularVelocity(0.6),
         )
     }
+}
+
+/// Bundle of components to add to a [`Pickup`] entity when it stops being carried by an enemy
+/// and starts existing on its own.
+pub(crate) fn after_drop_bundle() -> impl b::Bundle {
+    (
+        Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
+        p::RigidBody::Kinematic,
+        p::Collider::circle(5.),
+        p::LinearVelocity(vec2(0.0, -70.0)),
+        p::AngularVelocity(0.6),
+    )
 }
 
 // -------------------------------------------------------------------------------------------------

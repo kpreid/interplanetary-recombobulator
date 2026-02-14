@@ -503,7 +503,6 @@ fn start_new_game(
             // any health below the max translates into fever increase via player_health_is_fever_system()
             health: u8::MAX,
             hurt_animation_cooldown: 0.0,
-            drops: None,
         },
         b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, 0.0),
         PLAYFIELD_LAYERS,

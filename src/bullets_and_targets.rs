@@ -7,7 +7,7 @@ use bevy::prelude as b;
 use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
 
-use crate::pickup::PickupSpawnType;
+use crate::pickup::{Pickup, PickupSpawnType};
 use crate::{
     Coherence, Fervor, Fever, Lifetime, PLAYFIELD_LAYERS, Player, Quantity, Shoot, Team, Zees,
 };
@@ -29,9 +29,6 @@ pub(crate) struct Attackable {
 
     /// Set to 1.0 when damage occurs, and decays to 0.0.
     pub hurt_animation_cooldown: f32,
-
-    /// If successfully killed, spawns beneficial [`crate::Pickup`]s.
-    pub drops: Option<PickupSpawnType>,
 }
 
 /// This entity has a gun! It might be the player ship or an enemy ship.
@@ -222,7 +219,10 @@ pub(crate) fn gun_cooldown(time: b::Res<b::Time>, query: b::Query<&mut Gun>) {
 pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
     bullet_query: b::Query<(&Bullet, &Team, &p::CollidingEntities, &mut Lifetime)>,
-    mut target_query: b::Query<(&Team, &mut Attackable, &b::Transform)>,
+    mut target_query: b::Query<
+        (&Team, &mut Attackable, &b::Transform, &b::Children),
+        b::Without<b::ChildOf>,
+    >,
     fever_query: b::Single<&Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     mut coherence_query: b::Single<
         &mut Quantity,
@@ -232,6 +232,15 @@ pub(crate) fn bullet_hit_system(
         &mut Quantity,
         (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
     >,
+    mut children_to_drop_query: b::Query<
+        (&b::GlobalTransform, &mut b::Transform),
+        (
+            b::With<Pickup>,
+            b::With<b::ChildOf>,
+            b::Without<Bullet>,
+            b::Without<Quantity>,
+        ),
+    >,
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
@@ -240,7 +249,7 @@ pub(crate) fn bullet_hit_system(
         // is large enough. This is on purpose to make high Coherence shots more effective.
 
         'colliding: for &colliding_entity in &collisions.0 {
-            let Ok((&target_team, mut attackable, &attackable_transform)) =
+            let Ok((&target_team, mut attackable, &attackable_transform, target_children)) =
                 target_query.get_mut(colliding_entity)
             else {
                 // collided but is not attackable
@@ -264,12 +273,28 @@ pub(crate) fn bullet_hit_system(
                 attackable.hurt_flash();
             } else {
                 killed.insert(colliding_entity);
-                commands.entity(colliding_entity).despawn();
 
-                // Spawn a pickup if we should
-                if let Some(drops) = attackable.drops.as_ref() {
-                    commands
-                        .spawn(drops.pickup_bundle(&assets, attackable_transform.translation.xy()));
+                // Reparent children that are pickups.
+                // (In the future we might want to have a different condition)
+                //
+                // if let Some(drops) = attackable.drops.as_ref() {
+                //     commands
+                //         .spawn(drops.pickup_bundle(&assets, attackable_transform.translation.xy()));
+                // }
+                for &child in target_children {
+                    if let Ok((global_transform, mut local_transform)) =
+                        children_to_drop_query.get_mut(child)
+                    {
+                        // De-parent the pickup so it will survive the target being despawned,
+                        // preserve its global position, and give it its own physics.
+                        *local_transform = global_transform.compute_transform();
+
+                        let mut child_cmd = commands.entity(child);
+                        child_cmd.remove::<b::ChildOf>();
+                        child_cmd.insert(crate::pickup::after_drop_bundle());
+                    } else {
+                        b::warn!("attacked entity has child {child:?} which is not a pickup");
+                    }
                 }
 
                 if bullet_team == Team::Player
@@ -277,6 +302,8 @@ pub(crate) fn bullet_hit_system(
                 {
                     fervor_query.adjust_temporary_and_commit_previous_temporary(0.1);
                 }
+
+                commands.entity(colliding_entity).despawn();
             }
 
             // Play death or hurt sound
