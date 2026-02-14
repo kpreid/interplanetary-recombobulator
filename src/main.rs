@@ -526,7 +526,7 @@ fn start_new_game(
         p::Collider::circle(8.),
         Gun {
             cooldown: 0.0,
-            base_cooldown: 0.5,
+            base_cooldown: 0.25,
             trigger: false,
             pattern: Pattern::Coherent,
         },
