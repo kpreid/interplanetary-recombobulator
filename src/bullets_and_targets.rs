@@ -102,9 +102,9 @@ pub(crate) fn fire_gun_system(
         let mut origin_of_bullets_transform: b::Transform = *gun_transform;
         origin_of_bullets_transform.translation.z = Zees::Bullets.z();
 
-        let base_shooting_angle = match team {
-            Team::Player => 0.0,
-            Team::Enemy => PI,
+        let (base_shooting_angle, unmodified_bullet_speed) = match team {
+            Team::Player => (0.0, 400.0),
+            Team::Enemy => (PI, 200.0),
         };
 
         // 1 + 2 * spread_count is the number of bullets
@@ -113,11 +113,11 @@ pub(crate) fn fire_gun_system(
             Pattern::Coherent => (coherence_query.effective_value(), 3),
         };
 
-        let base_bullet_speed = 400.0 + coherence.powi(2) * 20000.0;
+        let bullet_speed_with_boost = unmodified_bullet_speed + coherence.powi(2) * 20000.0;
         let bullet_angle_step_rad = (1.0 - coherence * 0.9) * 5f32.to_radians();
         // bullets scaled so that they overlap themselves from frame to frame,
         // for both reliable collisions and for good visuals.
-        let bullet_scale = vec2(1.0, (base_bullet_speed * 0.003).max(1.0));
+        let bullet_scale = vec2(1.0, (bullet_speed_with_boost * 0.003).max(1.0));
 
         let sprite_size = images
             .get(&assets.player_bullet_sprite)
@@ -128,7 +128,7 @@ pub(crate) fn fire_gun_system(
         for bullet_angle_index in -spread_count..=spread_count {
             let bullet_angle_rad =
                 base_shooting_angle + bullet_angle_index as f32 * bullet_angle_step_rad;
-            let speed = rand::rng().random_range(0.5..=1.0) * base_bullet_speed;
+            let single_speed = rand::rng().random_range(0.5..=1.0) * bullet_speed_with_boost;
             let bullet_transform = origin_of_bullets_transform
                 * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
                 * b::Transform::from_translation(vec3(0.0, bullet_box_size.y / 2., 0.0))
@@ -143,7 +143,7 @@ pub(crate) fn fire_gun_system(
                     },
                 },
                 team,
-                Lifetime(0.4),
+                Lifetime(0.8),
                 b::Sprite::from_image(
                     match team {
                         Team::Player => &assets.player_bullet_sprite,
@@ -153,7 +153,9 @@ pub(crate) fn fire_gun_system(
                 ),
                 PLAYFIELD_LAYERS,
                 p::RigidBody::Kinematic,
-                p::LinearVelocity(Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, speed))),
+                p::LinearVelocity(
+                    Vec2::from_angle(bullet_angle_rad).rotate(vec2(0.0, single_speed)),
+                ),
                 p::Collider::ellipse(sprite_size.x / 2., sprite_size.y / 2.),
                 p::CollidingEntities::default(), // for dealing damage
                 bullet_transform
@@ -300,7 +302,10 @@ pub(crate) fn bullet_hit_system(
                 if bullet_team == Team::Player
                     && coherence_query.effective_value() > fever_query.effective_value()
                 {
-                    fervor_query.adjust_temporary_and_commit_previous_temporary(0.1);
+                    // by adding some of the previous value we make it easier to get big boosts
+                    // with combo kills
+                    let added_fervor = 0.0501 + 0.05 * fervor_query.temporary_stack().max(0.4);
+                    fervor_query.adjust_temporary_stacking_with_previous(added_fervor);
                 }
 
                 commands.entity(colliding_entity).despawn();

@@ -651,7 +651,7 @@ fn apply_movement(
     player_query: b::Query<&mut b::Transform, b::With<Player>>,
 ) -> b::Result {
     let movement: b::Vec2 = ***action;
-    let delta_position = movement * 150.0 * time.delta_secs(); // apply speed
+    let delta_position = movement * 200.0 * time.delta_secs(); // apply speed
     for mut transform in player_query {
         let new_position: b::Vec2 = (transform.translation.xy() + delta_position)
             .clamp(PLAYFIELD_RECT.min, PLAYFIELD_RECT.max);

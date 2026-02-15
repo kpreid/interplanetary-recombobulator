@@ -81,8 +81,13 @@ impl Quantity {
         self.reset_to(self.base + delta);
     }
 
-    pub fn adjust_permanent_keeping_temporary(&mut self, delta: f32) {
+    // pub fn adjust_permanent_keeping_temporary(&mut self, delta: f32) {
+    //     self.set_base_only(self.base + delta);
+    // }
+
+    pub fn adjust_permanent_keeping_temporary_absolutely(&mut self, delta: f32) {
         self.set_base_only(self.base + delta);
+        self.temporary_stack -= delta;
     }
 
     pub fn adjust_temporary_and_commit_previous_temporary(&mut self, delta: f32) {
@@ -111,9 +116,17 @@ impl Quantity {
         self.base = value.clamp(0.0, 1.0);
     }
 
-    /// Value which should apply to gameplay effects.
+    /// Value which should apply to gameplay effects (usually).
     pub fn effective_value(&self) -> f32 {
-        (self.base + self.temporary_stack).clamp(0.0, 1.0)
+        self.unclamped_effective_value().clamp(0.0, 1.0)
+    }
+
+    pub fn unclamped_effective_value(&self) -> f32 {
+        self.base + self.temporary_stack
+    }
+
+    pub fn temporary_stack(&self) -> f32 {
+        self.temporary_stack
     }
 }
 
@@ -140,7 +153,7 @@ pub(crate) fn quantity_behaviors_system(
     if fever.effective_value() == 1.0 {
         (*next_state).set_if_neq(GameState::WinOrGameOver);
         next_wog_state.set(WinOrGameOver::GameOver);
-    } else if fervor.effective_value() >= 0.99 {
+    } else if fervor.base >= 0.99 {
         (*next_state).set_if_neq(GameState::WinOrGameOver);
         next_wog_state.set(WinOrGameOver::Win);
     }
@@ -155,14 +168,17 @@ pub(crate) fn quantity_behaviors_system(
     // Excess fever goes away if not committed
     fever.temporary_stack *= 0.3f32.powf(time.delta_secs());
 
-    // Fervor always goes down no matter what and is harder to maintain the higher it is
+    // Fervor's permanent value moves towards its temporary value
     {
-        let fervor_decay = fervor.effective_value() * (0.95f32.powf(time.delta_secs()) - 1.0);
-        fervor.adjust_permanent_keeping_temporary(fervor_decay);
+        let change = fervor.temporary_stack * 0.3f32 * time.delta_secs();
+        fervor.adjust_permanent_keeping_temporary_absolutely(change);
     }
 
-    // Temporary fervor goes down even faster
-    fervor.temporary_stack *= 0.3f32.powf(time.delta_secs());
+    // Temporary fervor goes down linearly until it hits a most-negative value of -0.1 or the base
+    // value, whichever is higher.
+    fervor.temporary_stack = (fervor.temporary_stack - 0.06f32 * time.delta_secs())
+        .max(-0.1)
+        .max(-fervor.base);
 
     Ok(())
 }
@@ -196,7 +212,8 @@ pub(crate) fn update_quantity_display_system_2(
         let quantity: &Quantity = quantities.get(ufq.quantity_entity)?;
         let value = match ufq.property {
             UpdateProperty::BaseValue => quantity.base,
-            UpdateProperty::TemporaryValue => quantity.effective_value(),
+            // allow temp values > 1.0 to spill over the bar frame
+            UpdateProperty::TemporaryValue => quantity.unclamped_effective_value().max(0.0),
         };
         match ufq.effect {
             UpdateEffect::BarLength => {
