@@ -33,6 +33,9 @@ pub(crate) struct Attackable {
     pub hurt_animation_cooldown: f32,
 
     pub destruction_particle: Option<b::Handle<b::Image>>,
+
+    /// What team last hit it, to attribute the kill.
+    pub last_hit_by: Option<Team>,
 }
 
 /// This entity has a gun! It might be the player ship or an enemy ship.
@@ -232,46 +235,23 @@ pub(crate) fn bullet_hit_system(
             &Team,
             &mut Attackable,
             &b::Transform,
-            Option<&p::LinearVelocity>,
-            Option<&b::Children>,
         ),
         b::Without<b::ChildOf>,
     >,
-    fever_query: b::Single<&Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     mut coherence_query: b::Single<
         &mut Quantity,
         (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
     >,
-    mut fervor_query: b::Single<
-        &mut Quantity,
-        (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
-    >,
-    mut children_to_drop_query: b::Query<
-        (&b::GlobalTransform, &mut b::Transform),
-        (
-            b::With<Pickup>,
-            b::With<b::ChildOf>,
-            b::Without<Bullet>,
-            b::Without<Quantity>,
-        ),
-    >,
     assets: b::Res<crate::MyAssets>,
 ) -> b::Result {
-    let rng = &mut rand::rng();
-
     let mut killed = EntityHashSet::new();
     for (bullet, &bullet_team, collisions, mut bullet_lifetime) in bullet_query {
         // Note that a bullet may hit multiple targets and kill them if its collider
         // is large enough. This is on purpose to make high Coherence shots more effective.
 
         'colliding: for &colliding_entity in &collisions.0 {
-            let Ok((
-                &target_team,
-                mut target_attackable,
-                &target_tranaform,
-                target_velocity,
-                target_children,
-            )) = target_query.get_mut(colliding_entity)
+            let Ok((&target_team, mut target_attackable, &target_tranaform)) =
+                target_query.get_mut(colliding_entity)
             else {
                 // collided but is not attackable
                 // b::warn!("collided with {colliding_entity} but is not attackable");
@@ -290,71 +270,16 @@ pub(crate) fn bullet_hit_system(
             let new_health = target_attackable.health.saturating_sub(bullet.damage);
             let is_killed = new_health == 0;
 
-            if !is_killed {
-                target_attackable.health = new_health;
-                target_attackable.hurt_flash();
-            } else {
+            target_attackable.last_hit_by = Some(bullet_team);
+            target_attackable.health = new_health;
+            target_attackable.hurt_flash();
+
+            if is_killed {
                 killed.insert(colliding_entity);
-
-                let target_velocity = target_velocity.map_or(Vec2::ZERO, |&p::LinearVelocity(v)| v);
-
-                // Reparent children that are pickups.
-                // (In the future we might want to have a different condition)
-                for &child in target_children.into_iter().flatten() {
-                    if let Ok((global_transform, mut local_transform)) =
-                        children_to_drop_query.get_mut(child)
-                    {
-                        // De-parent the pickup so it will survive the target being despawned,
-                        // preserve its global position, and give it its own physics.
-                        *local_transform = global_transform.compute_transform();
-
-                        let mut child_cmd = commands.entity(child);
-                        child_cmd.remove::<b::ChildOf>();
-                        child_cmd.insert(crate::pickup::after_drop_bundle());
-                    } else {
-                        b::warn!("attacked entity has child {child:?} which is not a pickup");
-                    }
-                }
-
-                // Spawn debris
-                if let Some(particle) = target_attackable.destruction_particle.as_ref() {
-                    let particle_count = rng.random_range(20u32..40);
-                    for _ in 0..particle_count {
-                        let particle_direction_1 = Vec2::from(rand_distr::UnitDisc.sample(rng));
-                        let particle_direction_2 = Vec2::from(rand_distr::UnitDisc.sample(rng));
-                        let particle_position =
-                            target_tranaform.translation.xy() + particle_direction_1 * 15.0;
-                        let particle_velocity = target_velocity
-                            + particle_direction_1 * 50.0
-                            + particle_direction_2 * 50.0;
-                        commands.spawn((
-                            b::Sprite::from_image(particle.clone()),
-                            b::Transform::from_translation(
-                                particle_position.extend(Zees::Pickup.z()),
-                            )
-                            .with_rotation(b::Quat::from_rotation_z(
-                                rng.random_range(0.0f32..=PI * 2.0),
-                            )),
-                            PLAYFIELD_LAYERS,
-                            p::RigidBody::Kinematic,
-                            p::Collider::circle(1.0), // TODO: use a simple movement system w/o physics so as not to exercise collision
-                            p::LinearVelocity(particle_velocity),
-                            Lifetime(0.5), // TODO: would be more efficient to detect when the sprite is off the screen
-                        ));
-                    }
-                }
-
-                if bullet_team == Team::Player && fervor_is_active(&fever_query, &coherence_query) {
-                    // by adding some of the previous value we make it easier to get big boosts
-                    // with combo kills
-                    let added_fervor = 0.0501 + 0.05 * fervor_query.temporary_stack().max(0.4);
-                    fervor_query.adjust_temporary_stacking_with_previous(added_fervor);
-                }
-
-                commands.entity(colliding_entity).despawn();
             }
 
             // Play death or hurt sound
+            // TODO: move death sound to death system
             commands.spawn((
                 b::AudioPlayer::new(
                     if is_killed {
@@ -381,6 +306,105 @@ pub(crate) fn bullet_hit_system(
         }
     }
     Ok(())
+}
+
+/// Despawns [`Attackable`]s with health of 0, and produces side effects such as drops.
+pub(crate) fn death_system(
+    mut commands: b::Commands,
+    attackable_query: b::Query<
+        (
+            // Note: Beware requiring components here!
+            // Every required component becomes a condition!
+            b::Entity,
+            &mut Attackable,
+            &b::Transform,
+            Option<&p::LinearVelocity>,
+            Option<&b::Children>,
+        ),
+        (b::Changed<Attackable>, b::Without<b::ChildOf>),
+    >,
+    fever_query: b::Single<&Quantity, b::With<Fever>>,
+    coherence_query: b::Single<&Quantity, b::With<Coherence>>,
+    mut fervor_query: b::Single<
+        &mut Quantity,
+        (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
+    >,
+    mut children_to_drop_query: b::Query<
+        (&b::GlobalTransform, &mut b::Transform),
+        (
+            b::With<Pickup>,
+            b::With<b::ChildOf>,
+            b::Without<Bullet>,
+            b::Without<Quantity>,
+        ),
+    >,
+) {
+    let rng = &mut rand::rng();
+
+    for (dying_entity, dying_attackable, &dying_transform, dying_velocity, children_of_dying) in
+        attackable_query
+    {
+        if dying_attackable.health > 0 {
+            // not dying
+            continue;
+        }
+
+        let dying_velocity = dying_velocity.map_or(Vec2::ZERO, |&p::LinearVelocity(v)| v);
+
+        // Reparent children that are pickups.
+        // (In the future we might want to have a different condition)
+        for &child in children_of_dying.into_iter().flatten() {
+            if let Ok((global_transform, mut local_transform)) =
+                children_to_drop_query.get_mut(child)
+            {
+                // De-parent the pickup so it will survive the target being despawned,
+                // preserve its global position, and give it its own physics.
+                *local_transform = global_transform.compute_transform();
+
+                let mut child_cmd = commands.entity(child);
+                child_cmd.remove::<b::ChildOf>();
+                child_cmd.insert(crate::pickup::after_drop_bundle());
+            } else {
+                b::warn!("attacked entity has child {child:?} which is not a pickup");
+            }
+        }
+
+        // Spawn debris
+        if let Some(particle) = dying_attackable.destruction_particle.as_ref() {
+            let particle_count = rng.random_range(20u32..40);
+            for _ in 0..particle_count {
+                let particle_direction_1 = Vec2::from(rand_distr::UnitDisc.sample(rng));
+                let particle_direction_2 = Vec2::from(rand_distr::UnitDisc.sample(rng));
+                let particle_position =
+                    dying_transform.translation.xy() + particle_direction_1 * 15.0;
+                let particle_velocity =
+                    dying_velocity + particle_direction_1 * 50.0 + particle_direction_2 * 50.0;
+                commands.spawn((
+                    b::Sprite::from_image(particle.clone()),
+                    b::Transform::from_translation(particle_position.extend(Zees::Pickup.z()))
+                        .with_rotation(b::Quat::from_rotation_z(
+                            rng.random_range(0.0f32..=PI * 2.0),
+                        )),
+                    PLAYFIELD_LAYERS,
+                    p::RigidBody::Kinematic,
+                    p::Collider::circle(1.0), // TODO: use a simple movement system w/o physics so as not to exercise collision
+                    p::LinearVelocity(particle_velocity),
+                    Lifetime(0.5), // TODO: would be more efficient to detect when the sprite is off the screen
+                ));
+            }
+        }
+
+        if dying_attackable.last_hit_by == Some(Team::Player)
+            && fervor_is_active(&fever_query, &coherence_query)
+        {
+            // by adding some of the previous value we make it easier to get big boosts
+            // with combo kills
+            let added_fervor = 0.0501 + 0.05 * fervor_query.temporary_stack().max(0.4);
+            fervor_query.adjust_temporary_stacking_with_previous(added_fervor);
+        }
+
+        commands.entity(dying_entity).despawn();
+    }
 }
 
 pub(crate) fn hurt_animation_system(
@@ -410,8 +434,14 @@ pub(crate) fn player_health_is_fever_system(
     for mut attackable in player_query {
         let damage = u8::MAX - attackable.health;
         if damage > 0 {
-            attackable.health = u8::MAX;
             fever_query.adjust_permanent_including_temporary(damage as f32 * 0.1);
+
+            if fever_query.effective_value() == 1.0 {
+                // cause death
+                attackable.health = 0;
+            } else {
+                attackable.health = u8::MAX;
+            }
 
             // Taking any damage also resets fervor
             fervor_query.reset_to(0.0);

@@ -134,6 +134,7 @@ fn main() {
                 bullets_and_targets::bullet_hit_system, // hits may continue when dead/won
                 bullets_and_targets::player_health_is_fever_system
                     .run_if(b::in_state(GameState::Playing)),
+                bullets_and_targets::death_system,
             )
                 .chain()
                 .run_if(b::in_state(GameState::Playing).or(b::in_state(GameState::WinOrGameOver))),
@@ -759,6 +760,7 @@ fn start_new_game(
             health: u8::MAX,
             hurt_animation_cooldown: 0.0,
             destruction_particle: None, // TODO: add one
+            last_hit_by: None,
         },
         b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, 0.0),
         PLAYFIELD_LAYERS,
