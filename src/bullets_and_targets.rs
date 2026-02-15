@@ -61,15 +61,9 @@ pub(crate) enum Pattern {
     Coherent,
 }
 
-// -------------------------------------------------------------------------------------------------
-
-impl Attackable {
-    pub fn hurt_flash(&mut self) {
-        if self.hurt_animation_cooldown == 0.0 {
-            self.hurt_animation_cooldown = 0.1;
-        }
-    }
-}
+/// Event triggered whenever an [`Attackable`] takes damage, by the system making the health change.
+#[derive(Debug, b::Event)]
+pub(crate) struct Hurt(pub b::Entity);
 
 // -------------------------------------------------------------------------------------------------
 
@@ -234,7 +228,6 @@ pub(crate) fn bullet_hit_system(
             // Every required component becomes a condition for attackability!
             &Team,
             &mut Attackable,
-            &b::Transform,
         ),
         b::Without<b::ChildOf>,
     >,
@@ -242,7 +235,6 @@ pub(crate) fn bullet_hit_system(
         &mut Quantity,
         (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
     >,
-    assets: b::Res<crate::MyAssets>,
 ) -> b::Result {
     let mut killed = EntityHashSet::new();
     for (bullet, &bullet_team, collisions, mut bullet_lifetime) in bullet_query {
@@ -250,8 +242,7 @@ pub(crate) fn bullet_hit_system(
         // is large enough. This is on purpose to make high Coherence shots more effective.
 
         'colliding: for &colliding_entity in &collisions.0 {
-            let Ok((&target_team, mut target_attackable, &target_tranaform)) =
-                target_query.get_mut(colliding_entity)
+            let Ok((&target_team, mut target_attackable)) = target_query.get_mut(colliding_entity)
             else {
                 // collided but is not attackable
                 // b::warn!("collided with {colliding_entity} but is not attackable");
@@ -272,30 +263,11 @@ pub(crate) fn bullet_hit_system(
 
             target_attackable.last_hit_by = Some(bullet_team);
             target_attackable.health = new_health;
-            target_attackable.hurt_flash();
+            commands.trigger(Hurt(colliding_entity));
 
             if is_killed {
                 killed.insert(colliding_entity);
             }
-
-            // Play death or hurt sound
-            // TODO: move death sound to death system
-            commands.spawn((
-                b::AudioPlayer::new(
-                    if is_killed {
-                        &assets.enemy_kill_sound
-                    } else {
-                        &assets.enemy_hurt_sound
-                    }
-                    .clone(),
-                ),
-                b::PlaybackSettings {
-                    spatial: true,
-                    volume: bevy::audio::Volume::Decibels(-10.),
-                    ..b::PlaybackSettings::DESPAWN
-                },
-                target_tranaform,
-            ));
 
             bullet_lifetime.0 = 0.0; // cause bullet to die on the next frame
 
@@ -405,6 +377,43 @@ pub(crate) fn death_system(
 
         commands.entity(dying_entity).despawn();
     }
+}
+
+///
+pub(crate) fn hurt_side_effects_observer(
+    hurt: b::On<Hurt>,
+    mut commands: b::Commands,
+    assets: b::Res<crate::MyAssets>,
+    mut hurt_entity_query: b::Query<(&mut Attackable, &b::Transform)>,
+) -> b::Result {
+    let (mut attackable, &transform) = hurt_entity_query.get_mut(hurt.0)?;
+    let is_killed = attackable.health == 0;
+
+    if attackable.hurt_animation_cooldown == 0.0 {
+        attackable.hurt_animation_cooldown = 0.1;
+    }
+
+    // Play death or hurt sound
+    // TODO: move death sound to death system for consistency in the presence of fever updates
+    commands.spawn((
+        b::AudioPlayer::new(
+            // TODO: separate player hurt/kill sounds
+            if is_killed {
+                &assets.enemy_kill_sound
+            } else {
+                &assets.enemy_hurt_sound
+            }
+            .clone(),
+        ),
+        b::PlaybackSettings {
+            spatial: true,
+            volume: bevy::audio::Volume::Decibels(-10.),
+            ..b::PlaybackSettings::DESPAWN
+        },
+        transform,
+    ));
+
+    Ok(())
 }
 
 pub(crate) fn hurt_animation_system(

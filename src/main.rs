@@ -155,6 +155,7 @@ fn main() {
             b::FixedUpdate,
             enemy::spawn_enemies_system.run_if(b::in_state(GameState::Playing)),
         )
+        .add_observer(bullets_and_targets::hurt_side_effects_observer)
         .add_observer(bullets_and_targets::player_input_fire_gun)
         .run();
 }

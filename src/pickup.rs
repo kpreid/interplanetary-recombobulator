@@ -2,7 +2,7 @@ use avian2d::prelude::{self as p};
 use bevy::math::{Vec2, vec2};
 use bevy::prelude as b;
 
-use crate::bullets_and_targets::Attackable;
+use crate::bullets_and_targets::Hurt;
 use crate::quantity::{Coherence, Fervor, Fever, Quantity};
 use crate::rendering::{PLAYFIELD_LAYERS, Zees};
 use crate::{Lifetime, Player};
@@ -71,7 +71,7 @@ pub(crate) fn after_drop_bundle() -> impl b::Bundle {
 
 pub(crate) fn pickup_system(
     mut commands: b::Commands,
-    player_query: b::Single<(&p::CollidingEntities, &mut Attackable), b::With<Player>>,
+    player_query: b::Single<(b::Entity, &p::CollidingEntities), b::With<Player>>,
     pickups: b::Query<(&Pickup, &b::Transform)>,
     mut coherence: b::Single<
         &mut Quantity,
@@ -83,22 +83,19 @@ pub(crate) fn pickup_system(
     >,
     assets: b::Res<crate::MyAssets>,
 ) -> b::Result {
-    let (player_collisions, mut player_attackable) = player_query.into_inner();
+    let (player_entity, player_collisions) = player_query.into_inner();
     for &pickup_entity in &player_collisions.0 {
         let Ok((pickup, &pickup_transform)) = pickups.get(pickup_entity) else {
             // not a pickup
             continue;
         };
 
-        let sound_asset;
+        let mut sound_asset = None;
 
         match *pickup {
             Pickup::Damage(amount) => {
                 fever.adjust_permanent_including_temporary(amount);
-
-                player_attackable.hurt_flash();
-
-                sound_asset = Some(assets.enemy_hurt_sound.clone()); // TODO: separate player hurt 
+                commands.trigger(Hurt(player_entity));
             }
             Pickup::Cool(amount) => {
                 fever.adjust_permanent_clearing_temporary(-amount);
