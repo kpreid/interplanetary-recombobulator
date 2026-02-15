@@ -1,4 +1,5 @@
 use core::fmt::Write as _;
+use std::f64::consts::PI;
 
 use bevy::ecs::change_detection::DetectChangesMut;
 use bevy::math::vec2;
@@ -250,8 +251,9 @@ pub(crate) fn update_quantity_display_system_2(
                     b::Color::LinearRgba(b::LinearRgba::new(1.0, 1.0, 1.0, value));
             }
             UpdateEffect::PulsingOpacity => {
-                let pulsing_value =
-                    (value * (1.0 + time.elapsed_secs_f64().sin() as f32 * 0.1)).clamp(0.0, 1.0);
+                let pulsing_value = (value
+                    * (1.0 + (time.elapsed_secs_f64() * PI * 3.0).sin() as f32 * 0.4))
+                    .clamp(0.0, 1.0);
                 sprite.expect("need sprite component for Opacity").color =
                     b::Color::LinearRgba(b::LinearRgba::new(1.0, 1.0, 1.0, pulsing_value));
             }
