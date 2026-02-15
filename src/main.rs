@@ -578,7 +578,7 @@ fn setup_ui(
             ..default()
         },
         b::Transform::from_translation(vec3(0.0, 0.0, Zees::FullScreenCover.z())),
-        UI_LAYERS,
+        PLAYFIELD_LAYERS,
         UpdateFromQuantity {
             quantity_entity: *fever,
             property: quantity::UpdateProperty::TemporaryValue,
