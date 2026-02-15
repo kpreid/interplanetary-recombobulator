@@ -226,8 +226,7 @@ struct StatusText;
 
 #[derive(Debug, b::Component)]
 enum ButtonAction {
-    NewGame,
-    Menu,
+    SetState(GameState),
 }
 
 #[derive(Debug, b::Component)]
@@ -389,7 +388,10 @@ fn setup_ui(
             ..default()
         },
         VisibleInState(GameState::Menu),
-        b::children![button_bundle("New Game", ButtonAction::NewGame)],
+        b::children![button_bundle(
+            "New Game",
+            ButtonAction::SetState(GameState::Playing)
+        )],
     ));
 
     // Back to Menu button for Game Over
@@ -402,7 +404,26 @@ fn setup_ui(
             ..default()
         },
         VisibleInState(GameState::WinOrGameOver),
-        b::children![button_bundle("Menu", ButtonAction::Menu)],
+        b::children![button_bundle(
+            "Menu",
+            ButtonAction::SetState(GameState::Menu)
+        )],
+    ));
+
+    // Unpause button
+    commands.spawn((
+        b::Node {
+            width: b::percent(100),
+            height: b::percent(100),
+            align_items: b::AlignItems::Center,
+            justify_content: b::JustifyContent::Center,
+            ..default()
+        },
+        VisibleInState(GameState::Paused),
+        b::children![button_bundle(
+            "Resume",
+            ButtonAction::SetState(GameState::Playing)
+        )],
     ));
 }
 
@@ -813,11 +834,8 @@ fn button_system(
 
                 // TODO: would be better if this went through the same kind of path as key bindings
                 match action {
-                    Some(ButtonAction::NewGame) => {
-                        next_state.set(GameState::Playing);
-                    }
-                    Some(ButtonAction::Menu) => {
-                        next_state.set(GameState::Menu);
+                    Some(ButtonAction::SetState(state)) => {
+                        next_state.set(state.clone());
                     }
                     None => b::warn!("Button {entity:?} has no action"),
                 }
