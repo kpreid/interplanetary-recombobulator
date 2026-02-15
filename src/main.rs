@@ -271,6 +271,8 @@ struct MyAssets {
     enemy_bullet_sprite: b::Handle<b::Image>,
     #[asset(path = "enemy-fragment.png")]
     enemy_fragment_sprite: b::Handle<b::Image>,
+    #[asset(path = "enemy-shoot.ogg")]
+    enemy_shoot_sound: b::Handle<b::AudioSource>,
     #[asset(path = "enemy-hurt.ogg")]
     enemy_hurt_sound: b::Handle<b::AudioSource>,
     #[asset(path = "enemy-kill.ogg")]
@@ -283,8 +285,8 @@ struct MyAssets {
     player_ship_heat_sprite: b::Handle<b::Image>,
     #[asset(path = "player-bullet.png")]
     player_bullet_sprite: b::Handle<b::Image>,
-    #[asset(path = "shoot.ogg")]
-    shoot_sound: b::Handle<b::AudioSource>,
+    #[asset(path = "player-shoot.ogg")]
+    player_shoot_sound: b::Handle<b::AudioSource>,
 
     // Pickups
     #[asset(path = "pickup-cool.png")]
@@ -810,6 +812,10 @@ fn start_new_game(
             base_cooldown: 0.25,
             trigger: false,
             pattern: Pattern::Coherent,
+            shoot_sound: (
+                assets.player_shoot_sound.clone(),
+                bevy::audio::Volume::Decibels(-10.),
+            ),
         },
         b::children![(
             b::Sprite::from_image(assets.player_ship_heat_sprite.clone()),

@@ -51,6 +51,8 @@ pub(crate) struct Gun {
 
     /// Value `cooldown` is reset to after firing.
     pub base_cooldown: f32,
+
+    pub shoot_sound: (b::Handle<b::AudioSource>, bevy::audio::Volume),
 }
 
 #[derive(Debug)]
@@ -178,14 +180,12 @@ pub(crate) fn fire_gun_system(
             ));
         }
 
+        let (ref shoot_sound, volume) = gun.shoot_sound;
         commands.spawn((
-            b::AudioPlayer::new(assets.shoot_sound.clone()),
+            b::AudioPlayer::new(shoot_sound.clone()),
             b::PlaybackSettings {
                 spatial: true,
-                volume: match team {
-                    Team::Player => bevy::audio::Volume::Decibels(-10.),
-                    Team::Enemy => bevy::audio::Volume::Decibels(-30.),
-                },
+                volume,
                 speed: rand::rng().random_range(0.75..=1.25) + coherence.powi(2) * 2.0,
                 ..b::PlaybackSettings::DESPAWN
             },

@@ -104,6 +104,10 @@ fn enemy_bundle(assets: &MyAssets, position: Vec2) -> impl b::Bundle {
             base_cooldown: 2.0,
             trigger: false,
             pattern: Pattern::Single,
+            shoot_sound: (
+                assets.enemy_shoot_sound.clone(),
+                bevy::audio::Volume::Decibels(-20.),
+            ),
         },
         b::children![pickup],
     )
