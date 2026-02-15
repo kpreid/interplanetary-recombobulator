@@ -7,7 +7,7 @@ use bevy::app::PluginGroup as _;
 use bevy::ecs::change_detection::{DetectChanges, DetectChangesMut as _};
 use bevy::ecs::schedule::IntoScheduleConfigs;
 use bevy::ecs::spawn::SpawnRelated as _;
-use bevy::math::{Vec2, Vec3, Vec3Swizzles as _, ivec2, vec2, vec3};
+use bevy::math::{Vec2, Vec3, Vec3Swizzles as _, vec2, vec3};
 use bevy::prelude as b;
 use bevy::prelude::StateSet as _;
 use bevy::state::app::AppExtStates as _;
@@ -51,9 +51,6 @@ fn main() {
                 .set(b::ImagePlugin::default_nearest())
                 .set(b::WindowPlugin {
                     primary_window: Some(b::Window {
-                        //TODO: positioning for development, not for release
-                        position: b::WindowPosition::At(ivec2(3000, 0)),
-
                         resolution: {
                             let desired_scale = 2;
                             let cautionary_fudge_pixels = 2;
