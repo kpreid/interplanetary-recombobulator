@@ -8,6 +8,7 @@ use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
 
 use crate::pickup::Pickup;
+use crate::quantity::fervor_is_active;
 use crate::{
     Coherence, Fervor, Fever, Lifetime, PLAYFIELD_LAYERS, Player, Quantity, Shoot, Team, Zees,
 };
@@ -299,9 +300,7 @@ pub(crate) fn bullet_hit_system(
                     }
                 }
 
-                if bullet_team == Team::Player
-                    && coherence_query.effective_value() > fever_query.effective_value()
-                {
+                if bullet_team == Team::Player && fervor_is_active(&fever_query, &coherence_query) {
                     // by adding some of the previous value we make it easier to get big boosts
                     // with combo kills
                     let added_fervor = 0.0501 + 0.05 * fervor_query.temporary_stack().max(0.4);

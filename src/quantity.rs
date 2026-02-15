@@ -22,15 +22,15 @@ pub(crate) struct Quantity {
 }
 
 /// [`Quantity`] 1/3; affects shooting.
-#[derive(Debug, b::Component)]
+#[derive(Clone, Copy, Debug, b::Component)]
 pub(crate) struct Coherence;
 
 /// [`Quantity`] 2/3; maxing it is game over.
-#[derive(Debug, b::Component)]
+#[derive(Clone, Copy, Debug, b::Component)]
 pub(crate) struct Fever;
 
 /// [`Quantity`] 3/3; maxing it is a win.
-#[derive(Debug, b::Component)]
+#[derive(Clone, Copy, Debug, b::Component)]
 pub(crate) struct Fervor;
 
 /// Specifies a [`Quantity`] this entity should update its visual appearance (e.g. bar length) from.
@@ -188,9 +188,11 @@ pub(crate) fn quantity_behaviors_system(
 
 /// Updates display in quantity-specific ways
 pub(crate) fn update_quantity_display_system_1(
-    //coherence: b::Single<&Quantity, b::With<Coherence>>,
+    assets: Option<b::Res<crate::Preload>>,
     fever: b::Single<&Quantity, b::With<Fever>>,
-    //fervor: b::Single<&Quantity, b::With<Fervor>>,
+    coherence: b::Single<&Quantity, b::With<Coherence>>,
+    // fervor: b::Single<&Quantity, b::With<Fervor>>,
+    mut fervor_label_sprite: b::Single<&mut b::Sprite, b::With<crate::BarLabelSprite<Fervor>>>,
     mut pixel_camera: b::Single<&mut b::Camera, b::With<PlayfieldCamera>>,
 ) -> b::Result {
     pixel_camera.clear_color = bevy::camera::ClearColorConfig::Custom(b::Color::oklch(
@@ -198,6 +200,18 @@ pub(crate) fn update_quantity_display_system_1(
         fever.effective_value(),
         0.0,
     ));
+
+    if let Some(assets) = assets {
+        let image = if fervor_is_active(&fever, &coherence) {
+            &assets.text_bar_fervor_sprite
+        } else {
+            &assets.text_bar_fervor_inactive_sprite
+        };
+        if fervor_label_sprite.image != *image {
+            fervor_label_sprite.image = image.clone();
+        }
+    }
+
     Ok(())
 }
 
@@ -254,4 +268,8 @@ pub(crate) fn update_quantity_display_system_2(
         }
     }
     Ok(())
+}
+
+pub(crate) fn fervor_is_active(fever: &Quantity, coherence: &Quantity) -> bool {
+    coherence.effective_value() > fever.effective_value()
 }

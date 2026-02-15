@@ -242,6 +242,9 @@ struct VisibleInState(GameState);
 #[derive(Debug, b::Component)]
 struct BarParent<T>(T);
 
+#[derive(Debug, b::Component)]
+struct BarLabelSprite<T>(T);
+
 /// Assets that we use for things spawned after startup.
 #[derive(b::Resource, bevy_asset_loader::asset_collection::AssetCollection)]
 struct Preload {
@@ -292,6 +295,8 @@ struct Preload {
     text_bar_fever_sprite: b::Handle<b::Image>,
     #[asset(path = "text-bar-fervor.png")]
     text_bar_fervor_sprite: b::Handle<b::Image>,
+    #[asset(path = "text-bar-fervor-inactive.png")]
+    text_bar_fervor_inactive_sprite: b::Handle<b::Image>,
 
     // Misc
     #[asset(path = "star.png")]
@@ -540,7 +545,7 @@ fn button_bundle(assets: &Preload, label: &str, action: ButtonAction) -> impl b:
 }
 
 /// Build the UI for a [`Quantity`] bar
-fn bar_bundle<Marker: Send + Sync + 'static>(
+fn bar_bundle<Marker: Copy + Send + Sync + 'static>(
     marker: Marker,
     assets: &Preload,
     label: b::Handle<b::Image>,
@@ -604,6 +609,7 @@ fn bar_bundle<Marker: Send + Sync + 'static>(
             ),
             (
                 // Fancy label sprite
+                BarLabelSprite(marker),
                 b::Sprite::from_image(label),
                 bevy::sprite::Anchor::CENTER_LEFT,
                 b::Transform::from_translation(vec3(10.0, 10.0, Zees::UiFront2.z())),
