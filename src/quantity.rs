@@ -160,7 +160,7 @@ pub(crate) fn quantity_behaviors_system(
 
     // Loss of coherence becomes permanent if not removed
     {
-        let coherence_change = coherence.temporary_stack * (1.2f32.powf(time.delta_secs()) - 1.0);
+        let coherence_change = coherence.temporary_stack * (2.0f32.powf(time.delta_secs()) - 1.0);
         coherence.base += coherence_change;
         coherence.temporary_stack -= coherence_change;
     }
