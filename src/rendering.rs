@@ -102,7 +102,6 @@ pub(crate) fn setup_camera_system(
         b::Camera {
             // Render before the "main pass" camera and before the UI too
             order: -2,
-            clear_color: b::ClearColorConfig::Custom(bevy::color::palettes::css::GRAY.into()),
             viewport: Some(bevy::camera::Viewport {
                 physical_position: (SCREEN_SIZE - PLAYFIELD_SIZE) / 2,
                 physical_size: PLAYFIELD_SIZE,
@@ -130,12 +129,24 @@ pub(crate) fn setup_camera_system(
         UI_LAYERS,
     ));
 
+    // This sprite renders the pixel camera image to the `OuterCamera`
     commands.spawn((
         b::Sprite::from_image(pixel_camera_image_handle),
         Canvas,
         HIGH_RES_LAYERS,
     ));
-    commands.spawn((b::Camera2d, b::Msaa::Off, OuterCamera, HIGH_RES_LAYERS));
+
+    // This is the camera which actually renders to the window for the user to see
+    commands.spawn((
+        b::Camera2d,
+        b::Camera {
+            clear_color: b::ClearColorConfig::Custom(b::Color::BLACK),
+            ..default()
+        },
+        b::Msaa::Off,
+        OuterCamera,
+        HIGH_RES_LAYERS,
+    ));
 
     // Spatial audio listener (*not* attached to the player ship)
     commands.spawn((
