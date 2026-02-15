@@ -14,6 +14,7 @@ exhaust = "0.2.2"
 indoc = "2.0.1"
 itertools = "0.14.0"
 rand = { version = "0.10.0", default-features = false, features = ["thread_rng"] }
+rand_distr = { version = "0.6.0", default-features = false }
 getrandom = { version = "0.4.1", features = ["wasm_js"] }
 
 [profile.dev]

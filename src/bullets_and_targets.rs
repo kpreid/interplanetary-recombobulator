@@ -2,10 +2,11 @@ use std::f32::consts::PI;
 
 use avian2d::prelude as p;
 use bevy::ecs::entity::EntityHashSet;
-use bevy::math::{Vec2, vec2, vec3};
+use bevy::math::{Vec2, Vec3Swizzles as _, vec2, vec3};
 use bevy::prelude as b;
 use bevy_enhanced_input::prelude as bei;
 use rand::RngExt;
+use rand_distr::Distribution as _;
 
 use crate::pickup::Pickup;
 use crate::quantity::fervor_is_active;
@@ -30,6 +31,8 @@ pub(crate) struct Attackable {
 
     /// Set to 1.0 when damage occurs, and decays to 0.0.
     pub hurt_animation_cooldown: f32,
+
+    pub destruction_particle: Option<b::Handle<b::Image>>,
 }
 
 /// This entity has a gun! It might be the player ship or an enemy ship.
@@ -223,7 +226,13 @@ pub(crate) fn bullet_hit_system(
     mut commands: b::Commands,
     bullet_query: b::Query<(&Bullet, &Team, &p::CollidingEntities, &mut Lifetime)>,
     mut target_query: b::Query<
-        (&Team, &mut Attackable, &b::Transform, &b::Children),
+        (
+            &Team,
+            &mut Attackable,
+            &b::Transform,
+            &p::LinearVelocity,
+            &b::Children,
+        ),
         b::Without<b::ChildOf>,
     >,
     fever_query: b::Single<&Quantity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
@@ -246,14 +255,21 @@ pub(crate) fn bullet_hit_system(
     >,
     assets: b::Res<crate::Preload>,
 ) -> b::Result {
+    let rng = &mut rand::rng();
+
     let mut killed = EntityHashSet::new();
     for (bullet, &bullet_team, collisions, mut bullet_lifetime) in bullet_query {
         // Note that a bullet may hit multiple targets and kill them if its collider
         // is large enough. This is on purpose to make high Coherence shots more effective.
 
         'colliding: for &colliding_entity in &collisions.0 {
-            let Ok((&target_team, mut attackable, &attackable_transform, target_children)) =
-                target_query.get_mut(colliding_entity)
+            let Ok((
+                &target_team,
+                mut target_attackable,
+                &target_tranaform,
+                &target_velocity,
+                target_children,
+            )) = target_query.get_mut(colliding_entity)
             else {
                 // collided but is not attackable
                 continue 'colliding;
@@ -268,12 +284,12 @@ pub(crate) fn bullet_hit_system(
                 continue 'colliding;
             }
 
-            let new_health = attackable.health.saturating_sub(bullet.damage);
+            let new_health = target_attackable.health.saturating_sub(bullet.damage);
             let is_killed = new_health == 0;
 
             if !is_killed {
-                attackable.health = new_health;
-                attackable.hurt_flash();
+                target_attackable.health = new_health;
+                target_attackable.hurt_flash();
             } else {
                 killed.insert(colliding_entity);
 
@@ -297,6 +313,34 @@ pub(crate) fn bullet_hit_system(
                         child_cmd.insert(crate::pickup::after_drop_bundle());
                     } else {
                         b::warn!("attacked entity has child {child:?} which is not a pickup");
+                    }
+                }
+
+                // Spawn debris
+                if let Some(particle) = target_attackable.destruction_particle.as_ref() {
+                    let particle_count = rng.random_range(20u32..40);
+                    for _ in 0..particle_count {
+                        let particle_direction_1 = Vec2::from(rand_distr::UnitDisc.sample(rng));
+                        let particle_direction_2 = Vec2::from(rand_distr::UnitDisc.sample(rng));
+                        let particle_position =
+                            target_tranaform.translation.xy() + particle_direction_1 * 15.0;
+                        let particle_velocity = target_velocity.0
+                            + particle_direction_1 * 50.0
+                            + particle_direction_2 * 50.0;
+                        commands.spawn((
+                            b::Sprite::from_image(particle.clone()),
+                            b::Transform::from_translation(
+                                particle_position.extend(Zees::Pickup.z()),
+                            )
+                            .with_rotation(b::Quat::from_rotation_z(
+                                rng.random_range(0.0f32..=PI * 2.0),
+                            )),
+                            PLAYFIELD_LAYERS,
+                            p::RigidBody::Kinematic,
+                            p::Collider::circle(1.0), // TODO: use a simple movement system w/o physics so as not to exercise collision
+                            p::LinearVelocity(particle_velocity),
+                            Lifetime(0.5), // TODO: would be more efficient to detect when the sprite is off the screen
+                        ));
                     }
                 }
 
@@ -325,7 +369,7 @@ pub(crate) fn bullet_hit_system(
                     volume: bevy::audio::Volume::Decibels(-10.),
                     ..b::PlaybackSettings::DESPAWN
                 },
-                attackable_transform,
+                target_tranaform,
             ));
 
             bullet_lifetime.0 = 0.0; // cause bullet to die on the next frame

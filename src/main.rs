@@ -253,6 +253,8 @@ struct Preload {
     enemy_sprite: b::Handle<b::Image>,
     #[asset(path = "enemy-bullet.png")]
     enemy_bullet_sprite: b::Handle<b::Image>,
+    #[asset(path = "enemy-fragment.png")]
+    enemy_fragment_sprite: b::Handle<b::Image>,
     #[asset(path = "enemy-hurt.ogg")]
     enemy_hurt_sound: b::Handle<b::AudioSource>,
     #[asset(path = "enemy-kill.ogg")]
@@ -709,6 +711,7 @@ fn start_new_game(
             // any health below the max translates into fever increase via player_health_is_fever_system()
             health: u8::MAX,
             hurt_animation_cooldown: 0.0,
+            destruction_particle: None, // TODO: add one
         },
         b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, 0.0),
         PLAYFIELD_LAYERS,
@@ -889,8 +892,7 @@ fn star_bundle(assets: &Preload, fast_forward: f32) -> impl b::Bundle {
         .with_scale(Vec3::splat(2.0)),
         PLAYFIELD_LAYERS,
         p::RigidBody::Kinematic,
-        p::Collider::circle(1.0), // TODO: use a simple movement system w/o physics
-        // Note: no collider because it doesn't interact with anything
+        p::Collider::circle(1.0), // TODO: use a simple movement system w/o physics so as not to exercise collision
         p::LinearVelocity(velocity),
         Lifetime(20.0), // TODO: would be more efficient to detect when the sprite is off the screen
     )

@@ -84,6 +84,7 @@ fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
         Attackable {
             health: 10,
             hurt_animation_cooldown: 0.0,
+            destruction_particle: Some(assets.enemy_fragment_sprite.clone()),
         },
         Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
         EnemyShipAi,
