@@ -321,6 +321,8 @@ struct MyAssets {
     text_bar_fervor_sprite: b::Handle<b::Image>,
     #[asset(path = "text-bar-fervor-inactive.png")]
     text_bar_fervor_inactive_sprite: b::Handle<b::Image>,
+    #[asset(path = "screen-heat-fog.png")]
+    screen_heat_fog: b::Handle<b::Image>,
 
     // Misc
     #[asset(path = "star.png")]
@@ -562,6 +564,26 @@ fn setup_ui(
             Zees::UiMiddle.z(),
         )),
         UI_LAYERS,
+    ));
+
+    commands.spawn((
+        b::Sprite {
+            image: assets.screen_heat_fog.clone(),
+            custom_size: Some(SCREEN_SIZE.as_vec2()),
+            image_mode: b::SpriteImageMode::Tiled {
+                tile_x: true,
+                tile_y: true,
+                stretch_value: 2.0,
+            },
+            ..default()
+        },
+        b::Transform::from_translation(vec3(0.0, 0.0, Zees::FullScreenCover.z())),
+        UI_LAYERS,
+        UpdateFromQuantity {
+            quantity_entity: *fever,
+            property: quantity::UpdateProperty::TemporaryValue,
+            effect: quantity::UpdateEffect::PulsingOpacity,
+        },
     ));
 }
 

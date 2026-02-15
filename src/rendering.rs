@@ -34,6 +34,7 @@ pub(crate) enum Zees {
     UiMiddle = 11,
     UiFront = 12,
     UiFront2 = 13,
+    FullScreenCover = 14,
 }
 impl Zees {
     pub fn z(self) -> f32 {

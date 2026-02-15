@@ -52,6 +52,7 @@ pub(crate) enum UpdateProperty {
 pub(crate) enum UpdateEffect {
     BarLength,
     Opacity,
+    PulsingOpacity,
     VisibleIfEverNotZero,
     TextPercentage,
 }
@@ -219,6 +220,7 @@ pub(crate) fn update_quantity_display_system_1(
 /// Updates sprites from quantities as specified by [`UpdateFromQuantity`] components.
 /// The main job of this system is to update the bars.
 pub(crate) fn update_quantity_display_system_2(
+    time: b::Res<b::Time>,
     quantities: b::Query<&Quantity>,
     sprites_to_update: b::Query<(
         Option<&mut b::Sprite>,
@@ -246,6 +248,12 @@ pub(crate) fn update_quantity_display_system_2(
             UpdateEffect::Opacity => {
                 sprite.expect("need sprite component for Opacity").color =
                     b::Color::LinearRgba(b::LinearRgba::new(1.0, 1.0, 1.0, value));
+            }
+            UpdateEffect::PulsingOpacity => {
+                let pulsing_value =
+                    (value * (1.0 + time.elapsed_secs_f64().sin() as f32 * 0.1)).clamp(0.0, 1.0);
+                sprite.expect("need sprite component for Opacity").color =
+                    b::Color::LinearRgba(b::LinearRgba::new(1.0, 1.0, 1.0, pulsing_value));
             }
             UpdateEffect::VisibleIfEverNotZero => {
                 let mut visibility =
