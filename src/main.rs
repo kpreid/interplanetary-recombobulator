@@ -157,6 +157,10 @@ const SCREEN_SIZE: b::UVec2 = b::uvec2(640, 480);
 /// If you change this, the assets must be changed to match too
 const PLAYFIELD_SIZE: b::UVec2 = b::uvec2(320, 460);
 
+const SCREEN_RECT: b::Rect = b::Rect {
+    min: vec2(SCREEN_SIZE.x as f32 / -2., SCREEN_SIZE.y as f32 / -2.),
+    max: vec2(SCREEN_SIZE.x as f32 / 2., SCREEN_SIZE.y as f32 / 2.),
+};
 const PLAYFIELD_RECT: b::Rect = b::Rect {
     min: vec2(PLAYFIELD_SIZE.x as f32 / -2., PLAYFIELD_SIZE.y as f32 / -2.),
     max: vec2(PLAYFIELD_SIZE.x as f32 / 2., PLAYFIELD_SIZE.y as f32 / 2.),
@@ -272,8 +276,10 @@ struct Preload {
     // UI
     #[asset(path = "Kenney Future.ttf")]
     ui_font: b::Handle<b::Font>,
+    #[asset(path = "Kenney Mini Square.ttf")]
+    small_prop_font: b::Handle<b::Font>,
     #[asset(path = "Kenney Mini Square Mono.ttf")]
-    small_font: b::Handle<b::Font>,
+    small_mono_font: b::Handle<b::Font>,
     #[asset(path = "bar-frame.png")]
     bar_frame_sprite: b::Handle<b::Image>,
     #[asset(path = "bar-fill-base.png")]
@@ -313,6 +319,28 @@ struct Shoot;
 struct Escape;
 
 // -------------------------------------------------------------------------------------------------
+
+impl Preload {
+    // these methods know what a good font size for pixel matching is
+    fn small_prop_font(&self) -> b::TextFont {
+        b::TextFont {
+            font: self.small_prop_font.clone(),
+            font_size: 8.0,
+            font_smoothing: bevy::text::FontSmoothing::None,
+            ..default()
+        }
+    }
+    fn small_mono_font(&self) -> b::TextFont {
+        b::TextFont {
+            font: self.small_mono_font.clone(),
+            font_size: 8.0,
+            font_smoothing: bevy::text::FontSmoothing::None,
+            ..default()
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 // Startup systems (not all literally `Startup` schedule)
 
 fn setup_non_game_input(mut commands: b::Commands) {
@@ -329,7 +357,7 @@ fn setup_non_game_input(mut commands: b::Commands) {
 
 /// Early startup doesn't need assets to be ready ... except for the UI font which we will patch in
 fn setup_status_text(mut commands: b::Commands) {
-    // Gameplay status text
+    // Gameplay status text; also used for loading
     commands.spawn((
         StatusText,
         b::Text2d::new(""),
@@ -446,6 +474,36 @@ fn setup_ui(
             ButtonAction::SetState(GameState::Playing)
         )],
     ));
+
+    // Help and credits text
+    commands.spawn((
+        b::Text2d::new(indoc::indoc! {
+            "
+                Controls:
+                WASD + Space
+                ESC to pause
+                or use gamepad
+
+                Code and art
+                by kpreid
+                switchb.org/kpreid
+                github.com/kpreid
+                
+                Some fonts
+                by Kenney 
+                www.kenney.nl
+            ",
+        }),
+        assets.small_prop_font(),
+        b::TextLayout::new_with_justify(b::Justify::Left),
+        bevy::sprite::Anchor::TOP_LEFT,
+        b::Transform::from_translation(vec3(
+            SCREEN_RECT.min.x + 6.0,
+            SCREEN_RECT.max.y - 6.0,
+            Zees::UiMiddle.z(),
+        )),
+        UI_LAYERS,
+    ));
 }
 
 fn button_bundle(assets: &Preload, label: &str, action: ButtonAction) -> impl b::Bundle {
@@ -491,12 +549,7 @@ fn bar_bundle<Marker: Send + Sync + 'static>(
     tint: bevy::color::Color,
 ) -> impl b::Bundle {
     let percentage_position = vec3(130.0, 8.0, Zees::UiFront2.z());
-    let percentage_font = b::TextFont {
-        font: assets.small_font.clone(),
-        font_size: 8.0,
-        font_smoothing: bevy::text::FontSmoothing::None,
-        ..default()
-    };
+    let percentage_font = assets.small_mono_font();
 
     (
         BarParent(marker),

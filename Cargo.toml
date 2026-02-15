@@ -11,6 +11,7 @@ bevy = { version = "0.18.0", features = ["dynamic_linking"] }
 bevy_asset_loader = "0.25.0"
 bevy_enhanced_input = "0.23.2"
 exhaust = "0.2.2"
+indoc = "2.0.1"
 itertools = "0.14.0"
 rand = { version = "0.10.0", default-features = false, features = ["thread_rng"] }
 getrandom = { version = "0.4.1", features = ["wasm_js"] }
