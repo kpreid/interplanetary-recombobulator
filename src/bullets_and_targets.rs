@@ -227,11 +227,13 @@ pub(crate) fn bullet_hit_system(
     bullet_query: b::Query<(&Bullet, &Team, &p::CollidingEntities, &mut Lifetime)>,
     mut target_query: b::Query<
         (
+            // Note: Beware requiring components here!
+            // Every required component becomes a condition for attackability!
             &Team,
             &mut Attackable,
             &b::Transform,
-            &p::LinearVelocity,
-            &b::Children,
+            Option<&p::LinearVelocity>,
+            Option<&b::Children>,
         ),
         b::Without<b::ChildOf>,
     >,
@@ -267,11 +269,12 @@ pub(crate) fn bullet_hit_system(
                 &target_team,
                 mut target_attackable,
                 &target_tranaform,
-                &target_velocity,
+                target_velocity,
                 target_children,
             )) = target_query.get_mut(colliding_entity)
             else {
                 // collided but is not attackable
+                // b::warn!("collided with {colliding_entity} but is not attackable");
                 continue 'colliding;
             };
 
@@ -293,14 +296,11 @@ pub(crate) fn bullet_hit_system(
             } else {
                 killed.insert(colliding_entity);
 
+                let target_velocity = target_velocity.map_or(Vec2::ZERO, |&p::LinearVelocity(v)| v);
+
                 // Reparent children that are pickups.
                 // (In the future we might want to have a different condition)
-                //
-                // if let Some(drops) = attackable.drops.as_ref() {
-                //     commands
-                //         .spawn(drops.pickup_bundle(&assets, attackable_transform.translation.xy()));
-                // }
-                for &child in target_children {
+                for &child in target_children.into_iter().flatten() {
                     if let Ok((global_transform, mut local_transform)) =
                         children_to_drop_query.get_mut(child)
                     {
@@ -324,7 +324,7 @@ pub(crate) fn bullet_hit_system(
                         let particle_direction_2 = Vec2::from(rand_distr::UnitDisc.sample(rng));
                         let particle_position =
                             target_tranaform.translation.xy() + particle_direction_1 * 15.0;
-                        let particle_velocity = target_velocity.0
+                        let particle_velocity = target_velocity
                             + particle_direction_1 * 50.0
                             + particle_direction_2 * 50.0;
                         commands.spawn((

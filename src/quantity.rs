@@ -137,7 +137,6 @@ impl Quantity {
 // -------------------------------------------------------------------------------------------------
 
 pub(crate) fn quantity_behaviors_system(
-    mut commands: b::Commands,
     time: b::Res<b::Time>,
     mut coherence: b::Single<
         &mut Quantity,
