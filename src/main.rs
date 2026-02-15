@@ -359,7 +359,11 @@ fn setup_non_game_input(mut commands: b::Commands) {
         bei::actions!(
             NonGameInput[(
                 bei::Action::<Escape>::new(),
-                bei::bindings![b::KeyCode::Escape, b::GamepadButton::Start],
+                bei::bindings![
+                    b::KeyCode::Escape,
+                    b::GamepadButton::Start,
+                    b::GamepadButton::Select
+                ],
             )]
         ),
     ));
@@ -490,9 +494,13 @@ fn setup_ui(
         b::Text2d::new(indoc::indoc! {
             "
                 Controls:
-                WASD + Space
+                WASD or arrows
+                Space to shoot
                 ESC to pause
-                or use gamepad
+
+                or use gamepad:
+                any stick
+                any trigger or button
             ",
         }),
         assets.small_prop_font(),
@@ -744,12 +752,29 @@ fn start_new_game(
                 //bei::SmoothNudge::default(),
                 bei::Bindings::spawn((
                     bei::Cardinal::wasd_keys(),
+                    bei::Cardinal::arrows(),
+                    bei::Cardinal::dpad(),
                     bei::Axial::left_stick(),
+                    bei::Axial::right_stick(),
                 )),
             ),
             (
                 bei::Action::<Shoot>::new(),
-                bei::bindings![b::KeyCode::Space, b::GamepadButton::South],
+                bei::bindings![
+                    b::KeyCode::Space,
+                    b::KeyCode::ShiftLeft,
+                    b::KeyCode::ShiftRight,
+                    b::KeyCode::Enter,
+                    // let any button work for shooting including left-handed ones
+                    b::GamepadButton::South,
+                    b::GamepadButton::West,
+                    b::GamepadButton::East,
+                    b::GamepadButton::North,
+                    b::GamepadButton::RightTrigger,
+                    b::GamepadButton::RightTrigger2,
+                    b::GamepadButton::LeftTrigger,
+                    b::GamepadButton::LeftTrigger2,
+                ],
             )
         ]),
         p::Collider::circle(8.),
