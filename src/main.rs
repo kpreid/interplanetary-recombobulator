@@ -40,6 +40,8 @@ use crate::quantity::UpdateFromQuantity;
 
 // -------------------------------------------------------------------------------------------------
 
+const GAME_NAME: &str = "Interplanetary Recombobulator";
+
 fn main() {
     b::App::new()
         .add_plugins(
@@ -268,6 +270,8 @@ struct Preload {
     pickup_sound: b::Handle<b::AudioSource>,
 
     // UI
+    #[asset(path = "Kenney Future.ttf")]
+    ui_font: b::Handle<b::Font>,
     #[asset(path = "bar-frame.png")]
     bar_frame_sprite: b::Handle<b::Image>,
     #[asset(path = "bar-fill-base.png")]
@@ -321,7 +325,7 @@ fn setup_non_game_input(mut commands: b::Commands) {
     ));
 }
 
-/// Early startup doesn't need assets to be ready
+/// Early startup doesn't need assets to be ready ... except for the UI font which we will patch in
 fn setup_status_text(mut commands: b::Commands) {
     // Gameplay status text
     commands.spawn((
@@ -331,6 +335,10 @@ fn setup_status_text(mut commands: b::Commands) {
             // if we don’t set this, the text wraps undesirably, maybe because it gets changed?
             width: Some(PLAYFIELD_SIZE.x as f32),
             height: None,
+        },
+        b::TextShadow {
+            offset: vec2(1.0, 1.0),
+            color: b::Color::BLACK,
         },
         b::TextLayout::new_with_justify(b::Justify::Center),
         bevy::sprite::Anchor::CENTER,
@@ -346,7 +354,15 @@ fn setup_ui(
     coherence: b::Single<b::Entity, (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>)>,
     fever: b::Single<b::Entity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     fervor: b::Single<b::Entity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
+    status_text: b::Single<b::Entity, b::With<StatusText>>,
 ) {
+    commands.entity(*status_text).insert(b::TextFont {
+        font: assets.ui_font.clone(),
+        font_size: 26.0,
+        font_smoothing: bevy::text::FontSmoothing::None,
+        ..default()
+    });
+
     commands.spawn((
         b::Sprite::from_image(asset_server.load("playfield-frame.png")),
         b::Transform::from_xyz(0., 0., Zees::UiFront.z()),
@@ -389,6 +405,7 @@ fn setup_ui(
         },
         VisibleInState(GameState::Menu),
         b::children![button_bundle(
+            &assets,
             "New Game",
             ButtonAction::SetState(GameState::Playing)
         )],
@@ -405,6 +422,7 @@ fn setup_ui(
         },
         VisibleInState(GameState::WinOrGameOver),
         b::children![button_bundle(
+            &assets,
             "Menu",
             ButtonAction::SetState(GameState::Menu)
         )],
@@ -421,17 +439,32 @@ fn setup_ui(
         },
         VisibleInState(GameState::Paused),
         b::children![button_bundle(
+            &assets,
             "Resume",
             ButtonAction::SetState(GameState::Playing)
         )],
     ));
 }
 
-fn button_bundle(label: &str, action: ButtonAction) -> impl b::Bundle {
+fn button_bundle(assets: &Preload, label: &str, action: ButtonAction) -> impl b::Bundle {
+    let text_bundle = (
+        b::Text::new(label),
+        b::TextFont {
+            font: assets.ui_font.clone(),
+            font_size: 27.0,
+            ..default()
+        },
+        b::TextLayout::new_with_justify(b::Justify::Left),
+        b::TextColor(b::Color::srgb(0.9, 0.9, 0.9)),
+        b::TextShadow {
+            offset: vec2(1.0, 1.0),
+            color: b::Color::BLACK,
+        },
+    );
     (
         b::Button,
         b::Node {
-            width: b::px(150),
+            width: b::px(240),
             height: b::px(65),
             border: b::UiRect::all(b::px(5)),
             justify_content: b::JustifyContent::Center,
@@ -442,19 +475,7 @@ fn button_bundle(label: &str, action: ButtonAction) -> impl b::Bundle {
         action,
         b::BorderColor::all(b::Color::WHITE),
         b::BackgroundColor(NORMAL_BUTTON),
-        b::children![(
-            b::Text::new(label),
-            // TextFont {
-            //     font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-            //     font_size: 33.0,
-            //     ..default()
-            // },
-            b::TextColor(b::Color::srgb(0.9, 0.9, 0.9)),
-            b::TextShadow {
-                offset: vec2(1.0, 1.0),
-                color: b::Color::BLACK
-            },
-        )],
+        b::children![text_bundle],
     )
 }
 
@@ -788,7 +809,7 @@ fn update_status_text_system(
 ) {
     let new_text = match *state.get() {
         GameState::AssetLoading => "Loading",
-        GameState::Menu => "Ready", // TODO: make this blank once we have other menu UI
+        GameState::Menu => GAME_NAME,
         GameState::WinOrGameOver => match *wog_state.unwrap().get() {
             WinOrGameOver::GameOver => "Game Overheated",
             WinOrGameOver::Win => "Win",
