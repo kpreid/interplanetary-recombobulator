@@ -205,6 +205,9 @@ struct StarfieldSpawner {
     cooldown: f32,
 }
 
+#[derive(Debug, b::Component)]
+struct Star;
+
 /// Decremented by game time and despawns the entity when it is zero.
 ///
 /// Note that this component is also treated slightly specially for bullets;
@@ -827,11 +830,14 @@ fn despawn_game(
     mut commands: b::Commands,
     things: b::Query<
         b::Entity,
-        b::Or<(
-            b::With<Team>,
-            b::With<enemy::EnemySpawner>,
-            b::With<Lifetime>,
-        )>,
+        (
+            b::Or<(
+                b::With<Team>,
+                b::With<enemy::EnemySpawner>,
+                b::With<Lifetime>,
+            )>,
+            b::Without<Star>, // stars are not gameplay relevant and persist while not playing
+        ),
     >,
     // assets: b::Res<MyAssets>,
 ) {
@@ -976,6 +982,7 @@ fn star_bundle(assets: &MyAssets, fast_forward: f32) -> impl b::Bundle {
         .random_range(PLAYFIELD_RECT.min.x - overflow_x..=PLAYFIELD_RECT.max.x + overflow_x);
     let y = PLAYFIELD_RECT.max.y + 80. + rand::rng().random_range(0.0..=30.0); // start offscreen
     (
+        Star,
         b::Sprite::from_image(assets.star_sprite.clone()),
         b::Transform::from_translation(
             (vec2(x, y) + velocity * fast_forward).extend(Zees::Starfield.z()),
