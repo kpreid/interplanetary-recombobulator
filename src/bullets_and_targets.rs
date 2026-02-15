@@ -32,6 +32,8 @@ pub(crate) struct Attackable {
     /// Set to 1.0 when damage occurs, and decays to 0.0.
     pub hurt_animation_cooldown: f32,
 
+    pub hurt_sound: b::Handle<b::AudioSource>,
+
     pub destruction_particle: Option<b::Handle<b::Image>>,
 
     /// What team last hit it, to attribute the kill.
@@ -396,11 +398,11 @@ pub(crate) fn hurt_side_effects_observer(
     // TODO: move death sound to death system for consistency in the presence of fever updates
     commands.spawn((
         b::AudioPlayer::new(
-            // TODO: separate player hurt/kill sounds
+            // TODO: separate player kill sound
             if is_killed {
                 &assets.enemy_kill_sound
             } else {
-                &assets.enemy_hurt_sound
+                &attackable.hurt_sound
             }
             .clone(),
         ),

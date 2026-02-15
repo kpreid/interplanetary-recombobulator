@@ -287,6 +287,8 @@ struct MyAssets {
     player_bullet_sprite: b::Handle<b::Image>,
     #[asset(path = "player-shoot.ogg")]
     player_shoot_sound: b::Handle<b::AudioSource>,
+    #[asset(path = "player-hurt.ogg")]
+    player_hurt_sound: b::Handle<b::AudioSource>,
 
     // Pickups
     #[asset(path = "pickup-cool.png")]
@@ -767,6 +769,7 @@ fn start_new_game(
             health: u8::MAX,
             hurt_animation_cooldown: 0.0,
             destruction_particle: None, // TODO: add one
+            hurt_sound: assets.player_hurt_sound.clone(),
             last_hit_by: None,
         },
         // note: this sprite needs to not be a child so hurt_animation_system can modify it
