@@ -942,7 +942,7 @@ fn spawn_starfield_system(
         return;
     };
 
-    let spawn_period = 0.02;
+    let spawn_period = 0.16;
 
     let delta = time.delta_secs();
     for mut spawner in spawners {
@@ -968,10 +968,10 @@ fn spawn_starfield_system(
 fn star_bundle(assets: &MyAssets, fast_forward: f32) -> impl b::Bundle {
     let overflow_x = 30.0;
 
-    let velocity = vec2(
-        0.0, //rand::rng().random_range(-10.0..=10.0),
-        -rand::rng().random_range(40.0..=120.0),
-    );
+    let size = rand::rng().random_range(3.0..=6.0);
+    let speed = size * 3.0;
+    let velocity = vec2(0.0, -speed);
+    let size_exact = if size < 5.0 { 3.0 } else { 6.0 };
     let x = rand::rng()
         .random_range(PLAYFIELD_RECT.min.x - overflow_x..=PLAYFIELD_RECT.max.x + overflow_x);
     let y = PLAYFIELD_RECT.max.y + 80. + rand::rng().random_range(0.0..=30.0); // start offscreen
@@ -981,7 +981,7 @@ fn star_bundle(assets: &MyAssets, fast_forward: f32) -> impl b::Bundle {
             (vec2(x, y) + velocity * fast_forward).extend(Zees::Starfield.z()),
         )
         .with_rotation(b::Quat::from_rotation_z(-velocity.angle_to(Vec2::NEG_Y)))
-        .with_scale(Vec3::splat(2.0)),
+        .with_scale(Vec3::splat(size_exact / 3.0)), // sprite size is 3
         PLAYFIELD_LAYERS,
         p::RigidBody::Kinematic,
         p::Collider::circle(1.0), // TODO: use a simple movement system w/o physics so as not to exercise collision
