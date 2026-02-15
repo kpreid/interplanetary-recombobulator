@@ -1,3 +1,5 @@
+use core::fmt::Write as _;
+
 use bevy::ecs::change_detection::DetectChangesMut;
 use bevy::math::vec2;
 use bevy::prelude as b;
@@ -44,12 +46,14 @@ pub(crate) struct UpdateFromQuantity {
 pub(crate) enum UpdateProperty {
     BaseValue,
     TemporaryValue,
+    TemporaryStack,
 }
 #[derive(Debug)]
 pub(crate) enum UpdateEffect {
     BarLength,
     Opacity,
     VisibleIfEverNotZero,
+    TextPercentage,
 }
 
 // These constants are each the initial value of their corresponding `Quantity`
@@ -161,8 +165,7 @@ pub(crate) fn quantity_behaviors_system(
     // Loss of coherence becomes permanent if not removed
     {
         let coherence_change = coherence.temporary_stack * (2.0f32.powf(time.delta_secs()) - 1.0);
-        coherence.base += coherence_change;
-        coherence.temporary_stack -= coherence_change;
+        coherence.adjust_permanent_keeping_temporary_absolutely(coherence_change);
     }
 
     // Excess fever goes away if not committed
@@ -205,13 +208,15 @@ pub(crate) fn update_quantity_display_system_2(
     sprites_to_update: b::Query<(
         Option<&mut b::Sprite>,
         Option<&mut b::Visibility>,
+        Option<&mut b::Text2d>,
         &UpdateFromQuantity,
     )>,
 ) -> b::Result {
-    for (sprite, visibility, ufq) in sprites_to_update {
+    for (sprite, visibility, text, ufq) in sprites_to_update {
         let quantity: &Quantity = quantities.get(ufq.quantity_entity)?;
         let value = match ufq.property {
             UpdateProperty::BaseValue => quantity.base,
+            UpdateProperty::TemporaryStack => quantity.temporary_stack,
             // allow temp values > 1.0 to spill over the bar frame
             UpdateProperty::TemporaryValue => quantity.unclamped_effective_value().max(0.0),
         };
@@ -232,6 +237,18 @@ pub(crate) fn update_quantity_display_system_2(
                     visibility.expect("need visibility component for VisibleIfNotZero");
                 if value > 0.0 {
                     visibility.set_if_neq(b::Visibility::Visible);
+                }
+            }
+            UpdateEffect::TextPercentage => {
+                let text: &mut String =
+                    &mut text.expect("need text component for TextPercentage").0;
+                text.clear();
+                if let UpdateProperty::TemporaryStack = ufq.property {
+                    if value.abs() > 0.001 {
+                        write!(text, "{:+2}%", (value * 100.0).round()).unwrap();
+                    }
+                } else {
+                    write!(text, "{:2}%", (value * 100.0).round()).unwrap();
                 }
             }
         }

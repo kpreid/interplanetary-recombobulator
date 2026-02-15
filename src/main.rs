@@ -272,6 +272,8 @@ struct Preload {
     // UI
     #[asset(path = "Kenney Future.ttf")]
     ui_font: b::Handle<b::Font>,
+    #[asset(path = "Kenney Mini Square Mono.ttf")]
+    small_font: b::Handle<b::Font>,
     #[asset(path = "bar-frame.png")]
     bar_frame_sprite: b::Handle<b::Image>,
     #[asset(path = "bar-fill-base.png")]
@@ -488,6 +490,14 @@ fn bar_bundle<Marker: Send + Sync + 'static>(
     position: Vec2,
     tint: bevy::color::Color,
 ) -> impl b::Bundle {
+    let percentage_position = vec3(130.0, 8.0, Zees::UiFront2.z());
+    let percentage_font = b::TextFont {
+        font: assets.small_font.clone(),
+        font_size: 8.0,
+        font_smoothing: bevy::text::FontSmoothing::None,
+        ..default()
+    };
+
     (
         BarParent(marker),
         b::children![
@@ -540,11 +550,38 @@ fn bar_bundle<Marker: Send + Sync + 'static>(
                 UI_LAYERS,
             ),
             (
+                // Fancy label sprite
                 b::Sprite::from_image(label),
-                //b::Text2d::new(label),
-                //b::TextLayout::new_with_justify(b::Justify::Left),
                 bevy::sprite::Anchor::CENTER_LEFT,
-                b::Transform::from_translation(vec3(10.0, 13.0, Zees::UiFront2.z())),
+                b::Transform::from_translation(vec3(10.0, 10.0, Zees::UiFront2.z())),
+                UI_LAYERS,
+            ),
+            (
+                // Text for base percentage
+                b::Text2d::new(""),
+                // b::TextLayout::new_with_justify(b::Justify::Right),
+                bevy::sprite::Anchor::BOTTOM_RIGHT,
+                percentage_font.clone(),
+                quantity::UpdateFromQuantity {
+                    quantity_entity,
+                    property: quantity::UpdateProperty::BaseValue,
+                    effect: quantity::UpdateEffect::TextPercentage
+                },
+                b::Transform::from_translation(percentage_position),
+                UI_LAYERS,
+            ),
+            (
+                // Text for temporary percentage
+                b::Text2d::new(""),
+                // b::TextLayout::new_with_justify(b::Justify::Right),
+                bevy::sprite::Anchor::BOTTOM_RIGHT,
+                percentage_font,
+                quantity::UpdateFromQuantity {
+                    quantity_entity,
+                    property: quantity::UpdateProperty::TemporaryStack,
+                    effect: quantity::UpdateEffect::TextPercentage
+                },
+                b::Transform::from_translation(percentage_position + vec3(30.0, 0.0, 0.0)),
                 UI_LAYERS,
             )
         ],
