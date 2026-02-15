@@ -285,6 +285,8 @@ struct Preload {
     small_prop_font: b::Handle<b::Font>,
     #[asset(path = "Kenney Mini Square Mono.ttf")]
     small_mono_font: b::Handle<b::Font>,
+    #[asset(path = "playfield-frame.png")]
+    playfield_frame_sprite: b::Handle<b::Image>,
     #[asset(path = "bar-frame.png")]
     bar_frame_sprite: b::Handle<b::Image>,
     #[asset(path = "bar-fill-base.png")]
@@ -386,7 +388,6 @@ fn setup_status_text(mut commands: b::Commands) {
 
 fn setup_ui(
     mut commands: b::Commands,
-    asset_server: b::Res<b::AssetServer>,
     assets: b::Res<Preload>,
     coherence: b::Single<b::Entity, (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>)>,
     fever: b::Single<b::Entity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
@@ -401,7 +402,7 @@ fn setup_ui(
     });
 
     commands.spawn((
-        b::Sprite::from_image(asset_server.load("playfield-frame.png")),
+        b::Sprite::from_image(assets.playfield_frame_sprite.clone()),
         b::Transform::from_xyz(0., 0., Zees::UiFront.z()),
         UI_LAYERS,
     ));
