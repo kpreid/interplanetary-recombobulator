@@ -533,16 +533,20 @@ fn setup_ui(
             "
                 Code and art
                 by kpreid
-                switchb.org/kpreid
-                github.com/kpreid
+                switchb.org/kpreid/
+                github.com/kpreid/
                 
                 Some fonts
                 by Kenney 
-                www.kenney.nl
+                www.kenney.nl/
+
+                Sound effects
+                made with jsfxr
+                sfxr.me/
 
                 Made with Bevy
                 for Bevy Jam #7
-                bevy.org
+                bevy.org/
             ",
         }),
         assets.small_prop_font(),
