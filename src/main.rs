@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 use avian2d::prelude::{self as p, PhysicsTime as _};
 use bevy::app::PluginGroup as _;
 use bevy::ecs::change_detection::{DetectChanges, DetectChangesMut as _};
-use bevy::ecs::schedule::IntoScheduleConfigs;
+use bevy::ecs::schedule::{IntoScheduleConfigs, SystemCondition as _};
 use bevy::ecs::spawn::SpawnRelated as _;
 use bevy::math::{Vec2, Vec3, Vec3Swizzles as _, vec2, vec3};
 use bevy::prelude as b;
@@ -98,14 +98,16 @@ fn main() {
             b::OnExit(GameState::Menu),
             (reset_quantities_for_new_game, start_new_game).chain(),
         )
+        .add_systems(b::OnEnter(GameState::WinOrGameOver), end_of_game_effects)
         .add_systems(b::OnExit(GameState::WinOrGameOver), despawn_game)
-        .add_systems(b::OnEnter(GameState::Playing), unpause)
-        .add_systems(b::OnExit(GameState::Playing), pause)
+        .add_systems(b::OnEnter(GameState::Paused), pause)
+        .add_systems(b::OnExit(GameState::Paused), unpause)
         .add_observer(pause_unpause_observer)
         .add_systems(
             b::Update,
             // UI systems
             (
+                spawn_starfield_system,
                 rendering::fit_canvas_to_window_system,
                 update_status_text_system,
                 button_system,
@@ -119,17 +121,22 @@ fn main() {
             // between expire_lifetimes and bullet_hit_system for which  it is expected that
             // expirations happen on the next frame and not the current one.
             (
-                expire_lifetimes,
-                apply_movement,
-                pickup::pickup_system,
-                bullets_and_targets::gun_cooldown,
-                enemy::enemy_ship_ai,
-                bullets_and_targets::fire_gun_system,
-                bullets_and_targets::bullet_hit_system,
-                bullets_and_targets::player_health_is_fever_system,
+                expire_lifetimes, // expiry may continue when dead/won
+                (
+                    apply_movement,
+                    pickup::pickup_system,
+                    bullets_and_targets::gun_cooldown,
+                    enemy::enemy_ship_ai,
+                    bullets_and_targets::fire_gun_system,
+                )
+                    .chain()
+                    .run_if(b::in_state(GameState::Playing)),
+                bullets_and_targets::bullet_hit_system, // hits may continue when dead/won
+                bullets_and_targets::player_health_is_fever_system
+                    .run_if(b::in_state(GameState::Playing)),
             )
                 .chain()
-                .run_if(b::in_state(GameState::Playing)),
+                .run_if(b::in_state(GameState::Playing).or(b::in_state(GameState::WinOrGameOver))),
         )
         .add_systems(b::Update, bullets_and_targets::hurt_animation_system)
         .add_systems(
@@ -145,8 +152,7 @@ fn main() {
         )
         .add_systems(
             b::FixedUpdate,
-            (enemy::spawn_enemies_system, spawn_starfield_system)
-                .run_if(b::in_state(GameState::Playing)),
+            enemy::spawn_enemies_system.run_if(b::in_state(GameState::Playing)),
         )
         .add_observer(bullets_and_targets::player_input_fire_gun)
         .run();
@@ -816,7 +822,7 @@ fn start_new_game(
     });
 }
 
-// Despawn everything [`start_new_game`] spawns
+/// Despawn everything [`start_new_game`] spawns, to return to the menu
 fn despawn_game(
     mut commands: b::Commands,
     things: b::Query<
@@ -834,6 +840,32 @@ fn despawn_game(
         commands.entity(entity).despawn();
     }
     // start_new_game(commands, assets)
+}
+
+/// Effects that occur on win or loss
+fn end_of_game_effects(
+    mut commands: b::Commands,
+    wog_state: b::Res<b::State<WinOrGameOver>>,
+    player_query: b::Query<b::Entity, b::With<Player>>,
+    on_team_query: b::Query<(b::Entity, &Team)>,
+) {
+    match **wog_state {
+        WinOrGameOver::GameOver => {
+            // Delete player ship. TODO: do a nice explosion
+            for player_ship in player_query {
+                commands.entity(player_ship).despawn();
+            }
+        }
+        WinOrGameOver::Win => {
+            // Despawn everything on the enemy team so it can't keep attacking the player
+            // or looking like it will
+            for (entity, team) in on_team_query {
+                if *team == Team::Enemy {
+                    commands.entity(entity).despawn();
+                }
+            }
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -903,8 +935,13 @@ fn spawn_starfield_system(
     mut commands: b::Commands,
     time: b::Res<b::Time>,
     spawners: b::Query<&mut StarfieldSpawner>,
-    assets: b::Res<crate::MyAssets>,
+    assets: Option<b::Res<crate::MyAssets>>,
 ) {
+    // don't fail if assets not loaded yet
+    let Some(assets) = assets else {
+        return;
+    };
+
     let spawn_period = 0.02;
 
     let delta = time.delta_secs();

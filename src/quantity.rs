@@ -137,6 +137,7 @@ impl Quantity {
 // -------------------------------------------------------------------------------------------------
 
 pub(crate) fn quantity_behaviors_system(
+    mut commands: b::Commands,
     time: b::Res<b::Time>,
     mut coherence: b::Single<
         &mut Quantity,
@@ -153,7 +154,8 @@ pub(crate) fn quantity_behaviors_system(
     mut next_state: b::ResMut<b::NextState<GameState>>,
     mut next_wog_state: b::ResMut<b::NextState<WinOrGameOver>>,
 ) -> b::Result {
-    // Win and lose conditions
+    // Win and lose conditions.
+    // Side effects of these will be handled by OnEnter `crate::end_of_game_effects()`
     if fever.effective_value() == 1.0 {
         (*next_state).set_if_neq(GameState::WinOrGameOver);
         next_wog_state.set(WinOrGameOver::GameOver);
