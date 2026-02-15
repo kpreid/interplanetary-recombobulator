@@ -763,7 +763,9 @@ fn start_new_game(
             destruction_particle: None, // TODO: add one
             last_hit_by: None,
         },
-        b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, 0.0),
+        // note: this sprite needs to not be a child so hurt_animation_system can modify it
+        b::Sprite::from_image(assets.player_ship_sprite.clone()),
+        b::Transform::from_xyz(0., PLAYFIELD_RECT.min.y + 20.0, Zees::Player.z()),
         PLAYFIELD_LAYERS,
         b::Visibility::Visible,
         bei::actions!(Player[
@@ -805,21 +807,15 @@ fn start_new_game(
             trigger: false,
             pattern: Pattern::Coherent,
         },
-        b::children![
-            (
-                b::Sprite::from_image(assets.player_ship_sprite.clone()),
-                b::Transform::from_xyz(0., 0., Zees::Player.z()),
-            ),
-            (
-                b::Sprite::from_image(assets.player_ship_heat_sprite.clone()),
-                b::Transform::from_xyz(0., 0., Zees::AbovePlayer.z()),
-                UpdateFromQuantity {
-                    quantity_entity: *fever_q_entity,
-                    property: quantity::UpdateProperty::TemporaryValue,
-                    effect: quantity::UpdateEffect::Opacity,
-                },
-            )
-        ],
+        b::children![(
+            b::Sprite::from_image(assets.player_ship_heat_sprite.clone()),
+            b::Transform::from_xyz(0., 0., Zees::AbovePlayer.z() - Zees::Player.z()),
+            UpdateFromQuantity {
+                quantity_entity: *fever_q_entity,
+                property: quantity::UpdateProperty::TemporaryValue,
+                effect: quantity::UpdateEffect::Opacity,
+            },
+        )],
     ));
 
     commands.spawn(enemy::EnemySpawner {

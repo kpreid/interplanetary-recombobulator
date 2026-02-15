@@ -379,7 +379,6 @@ pub(crate) fn death_system(
     }
 }
 
-///
 pub(crate) fn hurt_side_effects_observer(
     hurt: b::On<Hurt>,
     mut commands: b::Commands,
