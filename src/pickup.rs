@@ -32,7 +32,7 @@ pub(crate) enum PickupSpawnType {
 // -------------------------------------------------------------------------------------------------
 
 impl PickupSpawnType {
-    pub(crate) fn pickup_bundle(&self, assets: &crate::Preload, position: Vec2) -> impl b::Bundle {
+    pub(crate) fn pickup_bundle(&self, assets: &crate::MyAssets, position: Vec2) -> impl b::Bundle {
         let image = match self {
             PickupSpawnType::Cool => &assets.pickup_cool_sprite,
             PickupSpawnType::Cohere => &assets.pickup_cohere_sprite,
@@ -81,7 +81,7 @@ pub(crate) fn pickup_system(
         &mut Quantity,
         (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
     >,
-    assets: b::Res<crate::Preload>,
+    assets: b::Res<crate::MyAssets>,
 ) -> b::Result {
     let (player_collisions, mut player_attackable) = player_query.into_inner();
     for &pickup_entity in &player_collisions.0 {

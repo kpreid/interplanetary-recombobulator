@@ -6,7 +6,7 @@ use rand::seq::IndexedRandom;
 use crate::bullets_and_targets::Pattern;
 use crate::pickup::PickupSpawnType;
 use crate::{
-    Gun, Lifetime, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Pickup, Preload, Team, Zees,
+    Gun, Lifetime, MyAssets, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Pickup, Team, Zees,
     bullets_and_targets::Attackable,
 };
 
@@ -30,7 +30,7 @@ pub(crate) fn spawn_enemies_system(
     mut commands: b::Commands,
     time: b::Res<b::Time>,
     spawners: b::Query<&mut EnemySpawner>,
-    assets: b::Res<crate::Preload>,
+    assets: b::Res<crate::MyAssets>,
 ) {
     const SPAWN_PATTERN: [[u8; 10]; 10] = [
         *b" X X  X X ",
@@ -73,7 +73,7 @@ pub(crate) fn spawn_enemies_system(
     }
 }
 
-fn enemy_bundle(assets: &Preload, position: Vec2) -> impl b::Bundle {
+fn enemy_bundle(assets: &MyAssets, position: Vec2) -> impl b::Bundle {
     let pickup = [(PickupSpawnType::Cool, 1.0), (PickupSpawnType::Cohere, 0.2)]
         .choose_weighted(&mut rand::rng(), |&(_, weight)| weight)
         .unwrap()

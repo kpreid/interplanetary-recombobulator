@@ -188,7 +188,7 @@ pub(crate) fn quantity_behaviors_system(
 
 /// Updates display in quantity-specific ways
 pub(crate) fn update_quantity_display_system_1(
-    assets: Option<b::Res<crate::Preload>>,
+    assets: Option<b::Res<crate::MyAssets>>,
     fever: b::Single<&Quantity, b::With<Fever>>,
     coherence: b::Single<&Quantity, b::With<Coherence>>,
     // fervor: b::Single<&Quantity, b::With<Fervor>>,

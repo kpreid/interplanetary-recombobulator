@@ -75,7 +75,7 @@ fn main() {
         .add_loading_state(
             bevy_asset_loader::loading_state::LoadingState::new(GameState::AssetLoading)
                 .continue_to_state(GameState::Menu)
-                .load_collection::<Preload>(),
+                .load_collection::<MyAssets>(),
         )
         .add_plugins(bevy_enhanced_input::EnhancedInputPlugin)
         .add_input_context::<Player>()
@@ -245,9 +245,10 @@ struct BarParent<T>(T);
 #[derive(Debug, b::Component)]
 struct BarLabelSprite<T>(T);
 
-/// Assets that we use for things spawned after startup.
+/// Assets that will be loaded up-front before the game is willing to start,
+/// and kept loaded by the handles stored as a resource.
 #[derive(b::Resource, bevy_asset_loader::asset_collection::AssetCollection)]
-struct Preload {
+struct MyAssets {
     // Enemy assets
     #[asset(path = "enemy.png")]
     enemy_sprite: b::Handle<b::Image>,
@@ -329,7 +330,7 @@ struct Escape;
 
 // -------------------------------------------------------------------------------------------------
 
-impl Preload {
+impl MyAssets {
     // these methods know what a good font size for pixel matching is
     fn small_prop_font(&self) -> b::TextFont {
         b::TextFont {
@@ -388,7 +389,7 @@ fn setup_status_text(mut commands: b::Commands) {
 
 fn setup_ui(
     mut commands: b::Commands,
-    assets: b::Res<Preload>,
+    assets: b::Res<MyAssets>,
     coherence: b::Single<b::Entity, (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>)>,
     fever: b::Single<b::Entity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
     fervor: b::Single<b::Entity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
@@ -533,7 +534,7 @@ fn setup_ui(
     ));
 }
 
-fn button_bundle(assets: &Preload, label: &str, action: ButtonAction) -> impl b::Bundle {
+fn button_bundle(assets: &MyAssets, label: &str, action: ButtonAction) -> impl b::Bundle {
     let text_bundle = (
         b::Text::new(label),
         b::TextFont {
@@ -569,7 +570,7 @@ fn button_bundle(assets: &Preload, label: &str, action: ButtonAction) -> impl b:
 /// Build the UI for a [`Quantity`] bar
 fn bar_bundle<Marker: Copy + Send + Sync + 'static>(
     marker: Marker,
-    assets: &Preload,
+    assets: &MyAssets,
     label: b::Handle<b::Image>,
     quantity_entity: b::Entity,
     position: Vec2,
@@ -695,7 +696,7 @@ fn setup_permanent_gameplay(mut commands: b::Commands) {
 
 fn start_new_game(
     mut commands: b::Commands,
-    assets: b::Res<Preload>,
+    assets: b::Res<MyAssets>,
     mut coherence: b::Single<
         &mut Quantity,
         (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
@@ -792,7 +793,7 @@ fn despawn_game(
             b::With<Lifetime>,
         )>,
     >,
-    // assets: b::Res<Preload>,
+    // assets: b::Res<MyAssets>,
 ) {
     bevy::log::info!("despawn_game");
     for entity in things {
@@ -868,7 +869,7 @@ fn spawn_starfield_system(
     mut commands: b::Commands,
     time: b::Res<b::Time>,
     spawners: b::Query<&mut StarfieldSpawner>,
-    assets: b::Res<crate::Preload>,
+    assets: b::Res<crate::MyAssets>,
 ) {
     let spawn_period = 0.02;
 
@@ -893,7 +894,7 @@ fn spawn_starfield_system(
     }
 }
 
-fn star_bundle(assets: &Preload, fast_forward: f32) -> impl b::Bundle {
+fn star_bundle(assets: &MyAssets, fast_forward: f32) -> impl b::Bundle {
     let overflow_x = 30.0;
 
     let velocity = vec2(

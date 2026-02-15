@@ -93,7 +93,7 @@ pub(crate) fn fire_gun_system(
     gun_query: b::Query<(&b::Transform, &mut Gun, &Team, b::Has<Player>)>,
     mut coherence_query: b::Single<&mut Quantity, (b::With<Coherence>, b::Without<Fever>)>,
     mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
-    assets: b::Res<crate::Preload>,
+    assets: b::Res<crate::MyAssets>,
     images: b::Res<b::Assets<b::Image>>,
 ) -> b::Result {
     for (gun_transform, mut gun, &team, is_player) in gun_query {
@@ -253,7 +253,7 @@ pub(crate) fn bullet_hit_system(
             b::Without<Quantity>,
         ),
     >,
-    assets: b::Res<crate::Preload>,
+    assets: b::Res<crate::MyAssets>,
 ) -> b::Result {
     let rng = &mut rand::rng();
 
