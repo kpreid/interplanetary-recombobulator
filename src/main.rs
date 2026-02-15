@@ -993,7 +993,7 @@ fn star_bundle(assets: &MyAssets, fast_forward: f32) -> impl b::Bundle {
         p::RigidBody::Kinematic,
         p::Collider::circle(1.0), // TODO: use a simple movement system w/o physics so as not to exercise collision
         p::LinearVelocity(velocity),
-        Lifetime(20.0), // TODO: would be more efficient to detect when the sprite is off the screen
+        Lifetime(60.0), // TODO: would be more efficient to detect when the sprite is off the screen
     )
 }
 
