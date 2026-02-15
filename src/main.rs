@@ -93,7 +93,11 @@ fn main() {
             ),
         )
         .add_systems(b::OnExit(GameState::AssetLoading), setup_ui)
-        .add_systems(b::OnExit(GameState::Menu), start_new_game)
+        .add_systems(b::OnEnter(GameState::Menu), reset_quantities_for_new_game)
+        .add_systems(
+            b::OnExit(GameState::Menu),
+            (reset_quantities_for_new_game, start_new_game).chain(),
+        )
         .add_systems(b::OnExit(GameState::WinOrGameOver), despawn_game)
         .add_systems(b::OnEnter(GameState::Playing), unpause)
         .add_systems(b::OnExit(GameState::Playing), pause)
@@ -702,37 +706,42 @@ fn setup_permanent_gameplay(mut commands: b::Commands) {
     });
 }
 
-fn start_new_game(
-    mut commands: b::Commands,
-    assets: b::Res<MyAssets>,
+fn reset_quantities_for_new_game(
     mut coherence: b::Single<
         &mut Quantity,
         (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
     >,
-    fever_query: b::Single<
-        (b::Entity, &mut Quantity),
+    mut fever: b::Single<
+        &mut Quantity,
         (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
     >,
     mut fervor: b::Single<
         &mut Quantity,
         (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
     >,
-
     bars_to_hide: b::Query<
         &mut b::Visibility,
         b::Or<(b::With<BarParent<Coherence>>, b::With<BarParent<Fervor>>)>,
     >,
 ) {
-    let (fever_q_entity, mut fever) = fever_query.into_inner();
     **coherence = Quantity::new(Coherence::INITIAL);
-    *fever = Quantity::new(Fever::INITIAL);
+    **fever = Quantity::new(Fever::INITIAL);
     **fervor = Quantity::new(Fervor::INITIAL);
 
     // Reset sticky visibility of bars
     for mut bar_vis in bars_to_hide {
         *bar_vis = b::Visibility::Hidden;
     }
+}
 
+fn start_new_game(
+    mut commands: b::Commands,
+    assets: b::Res<MyAssets>,
+    fever_q_entity: b::Single<
+        b::Entity,
+        (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
+    >,
+) {
     commands.spawn((
         Player,
         Team::Player,
@@ -793,7 +802,7 @@ fn start_new_game(
                 b::Sprite::from_image(assets.player_ship_heat_sprite.clone()),
                 b::Transform::from_xyz(0., 0., Zees::AbovePlayer.z()),
                 UpdateFromQuantity {
-                    quantity_entity: fever_q_entity,
+                    quantity_entity: *fever_q_entity,
                     property: quantity::UpdateProperty::TemporaryValue,
                     effect: quantity::UpdateEffect::Opacity,
                 },
