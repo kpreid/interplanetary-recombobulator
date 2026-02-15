@@ -13,6 +13,11 @@ use crate::{Lifetime, Player};
 /// This is used for both pickups and colliding with enemies.
 #[derive(Debug, b::Component)]
 pub(crate) enum Pickup {
+    /// Does nothing.
+    /// Immediately vanishes.
+    /// Used as a placeholder when a pickup bundle is required, but not wanted for gameplay.
+    Null,
+
     /// Increase [`Fever`] by this amount, and depict it as a damaging hit.
     Damage(f32),
     /// Decrease [`Fever`] by this amount.
@@ -25,7 +30,12 @@ pub(crate) enum Pickup {
 /// Determines the exact value and appearance using its internal logic.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum PickupSpawnType {
+    /// Invisible and immediately vanishes.
+    /// Used as a placeholder when a pickup bundle is required, but not wanted for gameplay.
+    Null,
+
     Cool,
+
     Cohere,
 }
 
@@ -34,13 +44,21 @@ pub(crate) enum PickupSpawnType {
 impl PickupSpawnType {
     pub(crate) fn pickup_bundle(&self, assets: &crate::MyAssets, position: Vec2) -> impl b::Bundle {
         let image = match self {
+            PickupSpawnType::Null => &assets.pickup_cool_sprite,
             PickupSpawnType::Cool => &assets.pickup_cool_sprite,
             PickupSpawnType::Cohere => &assets.pickup_cohere_sprite,
         };
 
         let effect = match self {
+            PickupSpawnType::Null => Pickup::Null,
             PickupSpawnType::Cool => Pickup::Cool(0.1),
             PickupSpawnType::Cohere => Pickup::Cohere(0.1),
+        };
+
+        // kludge to make null have no visible effect
+        let visibility = match self {
+            PickupSpawnType::Null => b::Visibility::Hidden,
+            _ => b::Visibility::Visible,
         };
 
         // This bundle contains the parts of the pickup that exist while it is being carried
@@ -49,6 +67,7 @@ impl PickupSpawnType {
         (
             b::Sprite::from_image(image.clone()),
             effect,
+            visibility,
             b::Transform::from_translation(position.extend(Zees::Pickup.z())),
             PLAYFIELD_LAYERS,
         )
@@ -57,9 +76,12 @@ impl PickupSpawnType {
 
 /// Bundle of components to add to a [`Pickup`] entity when it stops being carried by an enemy
 /// and starts existing on its own.
-pub(crate) fn after_drop_bundle() -> impl b::Bundle {
+pub(crate) fn after_drop_bundle(pickup: &Pickup) -> impl b::Bundle {
     (
-        Lifetime(20.0), // TODO: bad substitute for "die when offscreen"
+        Lifetime(match pickup {
+            Pickup::Null => 0.0, // go away immediately
+            _ => 20.0,           // TODO: bad substitute for "die when offscreen"
+        }),
         p::RigidBody::Kinematic,
         p::Collider::circle(5.),
         p::LinearVelocity(vec2(0.0, -70.0)),
@@ -93,6 +115,7 @@ pub(crate) fn pickup_system(
         let mut sound_asset = None;
 
         match *pickup {
+            Pickup::Null => {}
             Pickup::Damage(amount) => {
                 fever.adjust_permanent_including_temporary(amount);
                 commands.trigger(Hurt(player_entity));

@@ -304,9 +304,8 @@ pub(crate) fn death_system(
         (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
     >,
     mut children_to_drop_query: b::Query<
-        (&b::GlobalTransform, &mut b::Transform),
+        (&b::GlobalTransform, &mut b::Transform, &Pickup),
         (
-            b::With<Pickup>,
             b::With<b::ChildOf>,
             b::Without<Bullet>,
             b::Without<Quantity>,
@@ -328,7 +327,7 @@ pub(crate) fn death_system(
         // Reparent children that are pickups.
         // (In the future we might want to have a different condition)
         for &child in children_of_dying.into_iter().flatten() {
-            if let Ok((global_transform, mut local_transform)) =
+            if let Ok((global_transform, mut local_transform, pickup)) =
                 children_to_drop_query.get_mut(child)
             {
                 // De-parent the pickup so it will survive the target being despawned,
@@ -337,7 +336,7 @@ pub(crate) fn death_system(
 
                 let mut child_cmd = commands.entity(child);
                 child_cmd.remove::<b::ChildOf>();
-                child_cmd.insert(crate::pickup::after_drop_bundle());
+                child_cmd.insert(crate::pickup::after_drop_bundle(pickup));
             } else {
                 b::warn!("attacked entity has child {child:?} which is not a pickup");
             }

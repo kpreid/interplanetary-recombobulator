@@ -74,11 +74,20 @@ pub(crate) fn spawn_enemies_system(
 }
 
 fn enemy_bundle(assets: &MyAssets, position: Vec2) -> impl b::Bundle {
-    let pickup = [(PickupSpawnType::Cool, 1.0), (PickupSpawnType::Cohere, 0.2)]
+    let pickup_spawn_table = const {
+        &[
+            (PickupSpawnType::Null, 1.0),
+            (PickupSpawnType::Cool, 1.0),
+            (PickupSpawnType::Cohere, 0.4),
+        ]
+    };
+
+    let pickup = pickup_spawn_table
         .choose_weighted(&mut rand::rng(), |&(_, weight)| weight)
         .unwrap()
         .0
         .pickup_bundle(assets, vec2(0., 0.));
+
     (
         Team::Enemy,
         Attackable {
