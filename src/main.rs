@@ -631,13 +631,14 @@ fn bar_bundle<Marker: Copy + Send + Sync + 'static>(
 ) -> impl b::Bundle {
     let percentage_position = vec3(130.0, 8.0, Zees::UiFront2.z());
     let percentage_font = assets.small_mono_font();
+    let bar_frame_thickness = 4.0;
 
     (
         BarParent(marker),
         b::children![
             (
                 b::Sprite::from_image(assets.bar_frame_sprite.clone()),
-                b::Transform::from_translation(vec3(0.0, 0.0, Zees::UiFront.z())),
+                b::Transform::from_translation(vec3(-bar_frame_thickness, 0.0, Zees::UiFront.z())),
                 bevy::sprite::Anchor::CENTER_LEFT,
                 UI_LAYERS,
             ),
@@ -654,7 +655,7 @@ fn bar_bundle<Marker: Copy + Send + Sync + 'static>(
                     color: tint,
                     ..default()
                 },
-                b::Transform::from_translation(vec3(2.0, 0.0, Zees::UiBack.z())),
+                b::Transform::from_translation(vec3(0.0, 0.0, Zees::UiBack.z())),
                 bevy::sprite::Anchor::CENTER_LEFT,
                 quantity::UpdateFromQuantity {
                     quantity_entity,
@@ -674,7 +675,7 @@ fn bar_bundle<Marker: Copy + Send + Sync + 'static>(
                     color: tint,
                     ..default()
                 },
-                b::Transform::from_translation(vec3(2.0, 0.0, Zees::UiMiddle.z())),
+                b::Transform::from_translation(vec3(0.0, 0.0, Zees::UiMiddle.z())),
                 bevy::sprite::Anchor::CENTER_LEFT,
                 quantity::UpdateFromQuantity {
                     quantity_entity,
