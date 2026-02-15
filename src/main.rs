@@ -483,6 +483,7 @@ fn setup_ui(
     ));
 
     // Help and credits text
+    let text_margin = 6.0;
     commands.spawn((
         b::Text2d::new(indoc::indoc! {
             "
@@ -490,7 +491,21 @@ fn setup_ui(
                 WASD + Space
                 ESC to pause
                 or use gamepad
-
+            ",
+        }),
+        assets.small_prop_font(),
+        b::TextLayout::new_with_justify(b::Justify::Left),
+        bevy::sprite::Anchor::TOP_LEFT,
+        b::Transform::from_translation(vec3(
+            SCREEN_RECT.min.x + text_margin,
+            SCREEN_RECT.max.y - text_margin,
+            Zees::UiMiddle.z(),
+        )),
+        UI_LAYERS,
+    ));
+    commands.spawn((
+        b::Text2d::new(indoc::indoc! {
+            "
                 Code and art
                 by kpreid
                 switchb.org/kpreid
@@ -499,14 +514,18 @@ fn setup_ui(
                 Some fonts
                 by Kenney 
                 www.kenney.nl
+
+                Made with Bevy
+                for Bevy Jam #7
+                bevy.org
             ",
         }),
         assets.small_prop_font(),
         b::TextLayout::new_with_justify(b::Justify::Left),
-        bevy::sprite::Anchor::TOP_LEFT,
+        bevy::sprite::Anchor::BOTTOM_LEFT,
         b::Transform::from_translation(vec3(
-            SCREEN_RECT.min.x + 6.0,
-            SCREEN_RECT.max.y - 6.0,
+            SCREEN_RECT.min.x + text_margin,
+            SCREEN_RECT.min.y + text_margin,
             Zees::UiMiddle.z(),
         )),
         UI_LAYERS,
