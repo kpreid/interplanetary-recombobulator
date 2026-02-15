@@ -110,8 +110,8 @@ fn enemy_bundle(assets: &MyAssets, position: Vec2) -> impl b::Bundle {
         p::Collider::circle(8.),
         p::LinearVelocity(vec2(0.0, -40.0)),
         Gun {
-            cooldown: 0.0,
-            base_cooldown: 2.0,
+            cooldown: 3.0,
+            base_cooldown: 3.0,
             trigger: false,
             pattern: Pattern::Single,
             shoot_sound: (

@@ -148,7 +148,10 @@ pub(crate) fn fire_gun_system(
                     },
                 },
                 team,
-                Lifetime(0.8),
+                Lifetime(match team {
+                    Team::Player => 0.8,
+                    Team::Enemy => 10.0, // can cross the whole screen
+                }),
                 b::Sprite::from_image(
                     match team {
                         Team::Player => &assets.player_bullet_sprite,
