@@ -11,7 +11,8 @@ use rand_distr::Distribution as _;
 use crate::pickup::Pickup;
 use crate::quantity::fervor_is_active;
 use crate::{
-    Coherence, Fervor, Fever, Lifetime, PLAYFIELD_LAYERS, Player, Quantity, Shoot, Team, Zees,
+    Coherence, Fervor, Fever, Lifetime, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Player, Quantity, Shoot,
+    Team, Zees,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -233,6 +234,7 @@ pub(crate) fn bullet_hit_system(
             // Every required component becomes a condition for attackability!
             &Team,
             &mut Attackable,
+            &b::Transform,
         ),
         b::Without<b::ChildOf>,
     >,
@@ -247,7 +249,8 @@ pub(crate) fn bullet_hit_system(
         // is large enough. This is on purpose to make high Coherence shots more effective.
 
         'colliding: for &colliding_entity in &collisions.0 {
-            let Ok((&target_team, mut target_attackable)) = target_query.get_mut(colliding_entity)
+            let Ok((&target_team, mut target_attackable, target_transform)) =
+                target_query.get_mut(colliding_entity)
             else {
                 // collided but is not attackable
                 // b::warn!("collided with {colliding_entity} but is not attackable");
@@ -260,6 +263,12 @@ pub(crate) fn bullet_hit_system(
 
             if killed.contains(&colliding_entity) {
                 // already killed but not yet despawned; skip
+                continue 'colliding;
+            }
+
+            if !PLAYFIELD_RECT.contains(target_transform.translation.xy()) {
+                // don't allow shooting things that are off the screen
+                // (this is a kludge for the sake of enemies flying on screen)
                 continue 'colliding;
             }
 

@@ -240,6 +240,8 @@ pub(crate) fn enemy_ship_ai(
 
     for (mut ai, transform, mut velocity, mut gun) in query {
         let current_position = transform.translation.xy();
+        // don't shoot from off-screen because it is unfair *and* makes extra noises
+        let may_fire = PLAYFIELD_RECT.contains(transform.translation.xy());
 
         match ai.state {
             AiState::InitialWait(wait_time) => {
@@ -273,11 +275,10 @@ pub(crate) fn enemy_ship_ai(
                     velocity.0 = Vec2::ZERO;
                 }
 
-                gun.trigger = true;
+                gun.trigger |= may_fire;
             }
             AiState::Dive => {
-                // velocity.0 += vec2(0.0, -40.0) * dt;
-                gun.trigger = true;
+                gun.trigger |= may_fire;
             }
         }
     }
