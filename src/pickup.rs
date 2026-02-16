@@ -84,7 +84,7 @@ pub(crate) fn after_drop_bundle(pickup: &Pickup) -> impl b::Bundle {
         }),
         p::RigidBody::Kinematic,
         p::Collider::circle(8.), // a bit oversized to make it easier to collect
-        p::LinearVelocity(vec2(0.0, -120.0)),
+        p::LinearVelocity(vec2(0.0, -100.0)),
         p::AngularVelocity(0.6),
     )
 }

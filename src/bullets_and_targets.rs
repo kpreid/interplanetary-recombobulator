@@ -110,7 +110,7 @@ pub(crate) fn fire_gun_system(
 
         let (base_shooting_angle, unmodified_bullet_speed) = match team {
             Team::Player => (0.0, 400.0),
-            Team::Enemy => (PI, 300.0),
+            Team::Enemy => (PI, 210.0),
         };
 
         // 1 + 2 * spread_count is the number of bullets
@@ -134,7 +134,7 @@ pub(crate) fn fire_gun_system(
         for bullet_angle_index in -spread_count..=spread_count {
             let bullet_angle_rad =
                 base_shooting_angle + bullet_angle_index as f32 * bullet_angle_step_rad;
-            let single_speed = rand::rng().random_range(0.5..=1.0) * bullet_speed_with_boost;
+            let single_speed = rand::rng().random_range(0.75..=1.0) * bullet_speed_with_boost;
             let bullet_transform = origin_of_bullets_transform
                 * b::Transform::from_rotation(b::Quat::from_rotation_z(bullet_angle_rad))
                 * b::Transform::from_translation(vec3(0.0, bullet_box_size.y / 2., 0.0))
@@ -466,7 +466,7 @@ pub(crate) fn player_health_is_fever_system(
             }
 
             // Taking any damage also resets fervor
-            fervor_query.reset_to(0.0);
+            fervor_query.adjust_permanent_keeping_temporary(-0.2);
         }
     }
 }

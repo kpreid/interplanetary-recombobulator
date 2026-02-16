@@ -87,9 +87,9 @@ impl Quantity {
         self.reset_to(self.base + delta);
     }
 
-    // pub fn adjust_permanent_keeping_temporary(&mut self, delta: f32) {
-    //     self.set_base_only(self.base + delta);
-    // }
+    pub fn adjust_permanent_keeping_temporary(&mut self, delta: f32) {
+        self.set_base_only(self.base + delta);
+    }
 
     pub fn adjust_permanent_keeping_temporary_absolutely(&mut self, delta: f32) {
         self.set_base_only(self.base + delta);
@@ -160,7 +160,7 @@ pub(crate) fn quantity_behaviors_system(
     if fever.effective_value() == 1.0 {
         (*next_state).set_if_neq(GameState::WinOrGameOver);
         next_wog_state.set(WinOrGameOver::GameOver);
-    } else if fervor.base >= 0.99 {
+    } else if fervor.base >= 0.999 {
         (*next_state).set_if_neq(GameState::WinOrGameOver);
         next_wog_state.set(WinOrGameOver::Win);
     }

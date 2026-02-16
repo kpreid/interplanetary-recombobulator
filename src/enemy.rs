@@ -105,7 +105,7 @@ pub(crate) fn spawn_enemies_system(
         if *cooldown > 0.0 {
             // cooldown faster, i.e. spawn more often, when coherence & fervor is high
             let delta =
-                (1.0 + fervor.effective_value() * 0.5 + coherence.effective_value() * 0.5) * dt;
+                (1.0 + fervor.effective_value() * 1.25 + coherence.effective_value() * 0.5) * dt;
             *cooldown = (*cooldown - delta).max(0.0);
         } else {
             *cooldown = 7.0;
@@ -213,7 +213,7 @@ fn enemy_bundle(
         p::LinearVelocity(vec2(0.0, 0.0)),
         Gun {
             cooldown: rng.random_range(0.0..=3.0),
-            base_cooldown: 4.0,
+            base_cooldown: 6.0,
             trigger: false,
             pattern: Pattern::Single,
             shoot_sound: (
