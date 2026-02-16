@@ -3,10 +3,11 @@ use bevy::math::{Vec2, Vec3Swizzles as _, vec2};
 use bevy::prelude as b;
 use rand::RngExt as _;
 use rand::seq::IndexedRandom;
+use rand_distr::Distribution;
 
 use crate::bullets_and_targets::Pattern;
 use crate::pickup::PickupSpawnType;
-use crate::quantity::{Fervor, Quantity};
+use crate::quantity::{Coherence, Fervor, Quantity};
 use crate::{
     Gun, Lifetime, MyAssets, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Pickup, Team, Zees,
     bullets_and_targets::Attackable,
@@ -46,6 +47,7 @@ pub(crate) fn spawn_enemies_system(
     mut commands: b::Commands,
     time: b::Res<b::Time>,
     spawners: b::Query<&mut EnemySpawner>,
+    coherence: b::Single<&Quantity, b::With<Coherence>>,
     fervor: b::Single<&Quantity, b::With<Fervor>>,
     assets: b::Res<crate::MyAssets>,
 ) {
@@ -101,11 +103,18 @@ pub(crate) fn spawn_enemies_system(
     for mut spawner in spawners {
         let EnemySpawner { cooldown }: &mut EnemySpawner = &mut *spawner;
         if *cooldown > 0.0 {
-            // cooldown faster, i.e. spawn more often, when fervor is high
-            let delta = (1.0 + fervor.effective_value()) * dt;
+            // cooldown faster, i.e. spawn more often, when coherence & fervor is high
+            let delta =
+                (1.0 + fervor.effective_value() * 0.5 + coherence.effective_value() * 0.5) * dt;
             *cooldown = (*cooldown - delta).max(0.0);
         } else {
-            *cooldown = 5.0;
+            *cooldown = 7.0;
+
+            let mut offscreen_direction = Vec2::from(rand_distr::UnitCircle.sample(rng));
+            // limit to upper half-circle
+            offscreen_direction.y = offscreen_direction.y.abs();
+            let offscreen_offset = offscreen_direction * PLAYFIELD_RECT.size().x * 0.2
+                + vec2(0.0, PLAYFIELD_RECT.max.y);
 
             let pattern_to_spawn: &[[u8; _]; _] = SPAWN_PATTERNS.choose(rng).unwrap();
 
@@ -118,7 +127,7 @@ pub(crate) fn spawn_enemies_system(
             let pattern_spacing = spawn_range_rect.size().x * index_scale_factors.x;
 
             // Choose how much [`AiState::InitialWait`] time is used depending on the x and y index
-            let wait_time_scale = vec2(rng.random_range(-3.0..=3.0), rng.random_range(0.0..=3.0));
+            let wait_time_scale = vec2(rng.random_range(-3.0..=3.0), rng.random_range(-3.0..=0.0));
             let wait_time_offset = vec2(
                 offset_from_signed_scale(wait_time_scale.x),
                 offset_from_signed_scale(wait_time_scale.y),
@@ -127,7 +136,7 @@ pub(crate) fn spawn_enemies_system(
             for (yi, row) in pattern_to_spawn.iter().enumerate() {
                 for (xi, &ch) in row.iter().enumerate() {
                     let x = spawn_range_rect.min.x + xi as f32 * pattern_spacing;
-                    let y = spawn_range_rect.max.y - 40.0 - yi as f32 * pattern_spacing;
+                    let y = spawn_range_rect.max.y - yi as f32 * pattern_spacing;
 
                     let wait_times = wait_time_offset
                         + vec2(xi as f32, yi as f32) * wait_time_scale * index_scale_factors;
@@ -139,7 +148,7 @@ pub(crate) fn spawn_enemies_system(
                             commands.spawn(enemy_bundle(
                                 &assets,
                                 wait_time,
-                                vec2(x, PLAYFIELD_RECT.max.y + 30.0),
+                                vec2(x, y) + offscreen_offset,
                                 vec2(x, y),
                             ));
                         }
@@ -152,7 +161,7 @@ pub(crate) fn spawn_enemies_system(
 }
 
 fn offset_from_signed_scale(scale: f32) -> f32 {
-    if scale >= 0.0 { 0.0 } else { scale }
+    if scale >= 0.0 { 0.0 } else { -scale }
 }
 
 fn enemy_bundle(
