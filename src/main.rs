@@ -629,9 +629,9 @@ fn bar_bundle<Marker: Copy + Send + Sync + 'static>(
     position: Vec2,
     tint: bevy::color::Color,
 ) -> impl b::Bundle {
-    let percentage_position = vec3(130.0, 8.0, Zees::UiFront2.z());
-    let percentage_font = assets.small_mono_font();
     let bar_frame_thickness = 4.0;
+    let percentage_position = vec3(130.0, 6.0 + bar_frame_thickness, Zees::UiFront2.z());
+    let percentage_font = assets.small_mono_font();
 
     (
         BarParent(marker),
@@ -689,7 +689,7 @@ fn bar_bundle<Marker: Copy + Send + Sync + 'static>(
                 BarLabelSprite(marker),
                 b::Sprite::from_image(label),
                 bevy::sprite::Anchor::CENTER_LEFT,
-                b::Transform::from_translation(vec3(10.0, 10.0, Zees::UiFront2.z())),
+                b::Transform::from_translation(vec3(10.0, 12.0, Zees::UiFront2.z())),
                 UI_LAYERS,
             ),
             (
