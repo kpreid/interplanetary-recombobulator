@@ -6,6 +6,7 @@ use rand::seq::IndexedRandom;
 
 use crate::bullets_and_targets::Pattern;
 use crate::pickup::PickupSpawnType;
+use crate::quantity::{Fervor, Quantity};
 use crate::{
     Gun, Lifetime, MyAssets, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Pickup, Team, Zees,
     bullets_and_targets::Attackable,
@@ -45,6 +46,7 @@ pub(crate) fn spawn_enemies_system(
     mut commands: b::Commands,
     time: b::Res<b::Time>,
     spawners: b::Query<&mut EnemySpawner>,
+    fervor: b::Single<&Quantity, b::With<Fervor>>,
     assets: b::Res<crate::MyAssets>,
 ) {
     const SPAWN_PATTERNS: [[[u8; 10]; 4]; 7] = [
@@ -92,13 +94,15 @@ pub(crate) fn spawn_enemies_system(
         ],
     ];
 
-    let delta = time.delta_secs();
+    let dt = time.delta_secs();
     let rng = &mut rand::rng();
     let spawn_range_rect = PLAYFIELD_RECT.inflate(-20.0);
 
     for mut spawner in spawners {
         let EnemySpawner { cooldown }: &mut EnemySpawner = &mut *spawner;
         if *cooldown > 0.0 {
+            // cooldown faster, i.e. spawn more often, when fervor is high
+            let delta = (1.0 + fervor.effective_value()) * dt;
             *cooldown = (*cooldown - delta).max(0.0);
         } else {
             *cooldown = 5.0;
@@ -165,7 +169,7 @@ fn enemy_bundle(
         ]
     };
 
-let rng = &mut rand::rng();
+    let rng = &mut rand::rng();
 
     let pickup = pickup_spawn_table
         .choose_weighted(rng, |&(_, weight)| weight)

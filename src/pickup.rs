@@ -83,7 +83,7 @@ pub(crate) fn after_drop_bundle(pickup: &Pickup) -> impl b::Bundle {
             _ => 20.0,           // TODO: bad substitute for "die when offscreen"
         }),
         p::RigidBody::Kinematic,
-        p::Collider::circle(5.),
+        p::Collider::circle(8.), // a bit oversized to make it easier to collect
         p::LinearVelocity(vec2(0.0, -120.0)),
         p::AngularVelocity(0.6),
     )

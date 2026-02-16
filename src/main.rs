@@ -832,7 +832,7 @@ fn start_new_game(
                 ],
             )
         ]),
-        p::Collider::circle(8.),
+        p::Collider::circle(7.),
         Gun {
             cooldown: 0.0,
             base_cooldown: 0.25,
