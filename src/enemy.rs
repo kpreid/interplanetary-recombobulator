@@ -17,7 +17,6 @@ use crate::{
 #[derive(Debug, b::Component)]
 pub(crate) struct EnemySpawner {
     pub cooldown: f32,
-    pub spawn_pattern_state: usize,
 }
 
 /// Component adding enemy ship behaviors.
@@ -48,64 +47,108 @@ pub(crate) fn spawn_enemies_system(
     spawners: b::Query<&mut EnemySpawner>,
     assets: b::Res<crate::MyAssets>,
 ) {
-    const SPAWN_PATTERN: [[u8; 10]; 10] = [
-        *b" X X  X X ",
-        *b"  X    X  ",
-        *b" X X  X X ",
-        *b"          ",
-        *b"          ",
-        *b"   XXXX   ",
-        *b"   X  X   ",
-        *b"  X XX X  ",
-        *b"   X  X   ",
-        *b"          ",
+    const SPAWN_PATTERNS: [[[u8; 10]; 4]; 7] = [
+        [
+            *b" XX  XX   ",
+            *b"   XX  XX ",
+            *b"          ",
+            *b"          ",
+        ],
+        [
+            *b"          ",
+            *b" XXXXXXXX ",
+            *b"          ",
+            *b"          ",
+        ],
+        [
+            *b"X        X",
+            *b" X      X ",
+            *b"  X    X  ",
+            *b"   X  X   ",
+        ],
+        [
+            *b" X X  X X ",
+            *b"  X    X  ",
+            *b" X X  X X ",
+            *b"  X    X  ",
+        ],
+        [
+            *b" XX       ",
+            *b"X  X      ",
+            *b"X  X      ",
+            *b" XX       ",
+        ],
+        [
+            *b"    XX    ",
+            *b"   XXXX   ",
+            *b"   XXXX   ",
+            *b"    XX    ",
+        ],
+        [
+            *b"       XX ",
+            *b"      X  X",
+            *b"      X  X",
+            *b"       XX ",
+        ],
     ];
 
     let delta = time.delta_secs();
+    let rng = &mut rand::rng();
+    let spawn_range_rect = PLAYFIELD_RECT.inflate(-20.0);
+
     for mut spawner in spawners {
-        let EnemySpawner {
-            cooldown,
-            spawn_pattern_state,
-        }: &mut EnemySpawner = &mut *spawner;
+        let EnemySpawner { cooldown }: &mut EnemySpawner = &mut *spawner;
         if *cooldown > 0.0 {
             *cooldown = (*cooldown - delta).max(0.0);
         } else {
-            *cooldown = 2.0;
+            *cooldown = 5.0;
 
-            let row_to_spawn = &SPAWN_PATTERN[*spawn_pattern_state % SPAWN_PATTERN.len()];
-            *spawn_pattern_state = (*spawn_pattern_state + 1) % SPAWN_PATTERN.len();
+            let pattern_to_spawn: &[[u8; _]; _] = SPAWN_PATTERNS.choose(rng).unwrap();
 
             // scales `i` below down to a 0-1 range, inclusive
-            let index_scale_factor = ((row_to_spawn.len() - 1) as f32).recip();
+            let index_scale_factors = vec2(
+                ((pattern_to_spawn[0].len() - 1) as f32).recip(),
+                ((pattern_to_spawn.len() - 1) as f32).recip(),
+            );
 
-            let wait_time_randomization = rand::rng().random_range(-3.0..=3.0);
-            let (wait_time_range, wait_time_offset) = if wait_time_randomization > 0.0 {
-                (wait_time_randomization, 0.0)
-            } else {
-                (-wait_time_randomization, 3.0)
-            };
+            let pattern_spacing = spawn_range_rect.size().x * index_scale_factors.x;
 
-            for (i, &ch) in row_to_spawn.iter().enumerate() {
-                let x = PLAYFIELD_RECT.min.x
-                    + i as f32 * (PLAYFIELD_RECT.size().x * index_scale_factor);
+            // Choose how much [`AiState::InitialWait`] time is used depending on the x and y index
+            let wait_time_scale = vec2(rng.random_range(-3.0..=3.0), rng.random_range(0.0..=3.0));
+            let wait_time_offset = vec2(
+                offset_from_signed_scale(wait_time_scale.x),
+                offset_from_signed_scale(wait_time_scale.y),
+            );
 
-                let wait_time = wait_time_offset + i as f32 * wait_time_range * index_scale_factor;
+            for (yi, row) in pattern_to_spawn.iter().enumerate() {
+                for (xi, &ch) in row.iter().enumerate() {
+                    let x = spawn_range_rect.min.x + xi as f32 * pattern_spacing;
+                    let y = spawn_range_rect.max.y - 40.0 - yi as f32 * pattern_spacing;
 
-                match ch {
-                    b' ' => {}
-                    b'X' => {
-                        commands.spawn(enemy_bundle(
-                            &assets,
-                            wait_time,
-                            vec2(x, PLAYFIELD_RECT.max.y + 20.0),
-                            vec2(x, PLAYFIELD_RECT.max.y - 20.0),
-                        ));
+                    let wait_times = wait_time_offset
+                        + vec2(xi as f32, yi as f32) * wait_time_scale * index_scale_factors;
+                    let wait_time = wait_times.x + wait_times.y;
+
+                    match ch {
+                        b' ' => {}
+                        b'X' => {
+                            commands.spawn(enemy_bundle(
+                                &assets,
+                                wait_time,
+                                vec2(x, PLAYFIELD_RECT.max.y + 30.0),
+                                vec2(x, y),
+                            ));
+                        }
+                        _ => unreachable!(),
                     }
-                    _ => unreachable!(),
                 }
             }
         }
     }
+}
+
+fn offset_from_signed_scale(scale: f32) -> f32 {
+    if scale >= 0.0 { 0.0 } else { scale }
 }
 
 fn enemy_bundle(
@@ -117,13 +160,15 @@ fn enemy_bundle(
     let pickup_spawn_table = const {
         &[
             (PickupSpawnType::Null, 1.0),
-            (PickupSpawnType::Cool, 1.0),
+            (PickupSpawnType::Cool, 1.5),
             (PickupSpawnType::Cohere, 0.4),
         ]
     };
 
+let rng = &mut rand::rng();
+
     let pickup = pickup_spawn_table
-        .choose_weighted(&mut rand::rng(), |&(_, weight)| weight)
+        .choose_weighted(rng, |&(_, weight)| weight)
         .unwrap()
         .0
         .pickup_bundle(assets, vec2(0., 0.));
@@ -154,8 +199,8 @@ fn enemy_bundle(
         p::Collider::circle(8.),
         p::LinearVelocity(vec2(0.0, 0.0)),
         Gun {
-            cooldown: 3.0,
-            base_cooldown: 3.0,
+            cooldown: rng.random_range(0.0..=3.0),
+            base_cooldown: 4.0,
             trigger: false,
             pattern: Pattern::Single,
             shoot_sound: (
@@ -210,7 +255,7 @@ pub(crate) fn enemy_ship_ai(
                 ai.time_on_station = new_time_on_station;
                 if new_time_on_station == 0.0 {
                     ai.state = AiState::Dive;
-                    velocity.0 = vec2(0.0, -100.0);
+                    velocity.0 = vec2(0.0, -80.0);
                 } else {
                     velocity.0 = Vec2::ZERO;
                 }

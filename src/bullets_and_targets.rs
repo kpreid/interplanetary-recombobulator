@@ -109,7 +109,7 @@ pub(crate) fn fire_gun_system(
 
         let (base_shooting_angle, unmodified_bullet_speed) = match team {
             Team::Player => (0.0, 400.0),
-            Team::Enemy => (PI, 400.0),
+            Team::Enemy => (PI, 300.0),
         };
 
         // 1 + 2 * spread_count is the number of bullets
@@ -149,7 +149,7 @@ pub(crate) fn fire_gun_system(
                 },
                 team,
                 Lifetime(match team {
-                    Team::Player => 0.8,
+                    Team::Player => 2.0,
                     Team::Enemy => 10.0, // can cross the whole screen
                 }),
                 b::Sprite::from_image(
@@ -373,9 +373,10 @@ pub(crate) fn death_system(
         if dying_attackable.last_hit_by == Some(Team::Player)
             && fervor_is_active(&fever_query, &coherence_query)
         {
-            // by adding some of the previous value we make it easier to get big boosts
-            // with combo kills
-            let added_fervor = 0.0501 + 0.05 * fervor_query.temporary_stack().max(0.4);
+            // Increase fervor if the player made this kill.
+            // By adding some of the previous value we make it easier to get big boosts
+            // with combo kills.
+            let added_fervor = 0.0301 + 0.03 * fervor_query.temporary_stack().max(0.4);
             fervor_query.adjust_temporary_stacking_with_previous(added_fervor);
         }
 
