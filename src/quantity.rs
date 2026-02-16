@@ -1,7 +1,6 @@
 use core::fmt::Write as _;
 use std::f64::consts::PI;
 
-use bevy::camera::Camera3d;
 use bevy::ecs::change_detection::DetectChangesMut;
 use bevy::math::vec2;
 use bevy::prelude as b;

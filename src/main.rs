@@ -382,6 +382,8 @@ fn setup_non_game_input(mut commands: b::Commands) {
                 bei::Action::<Escape>::new(),
                 bei::bindings![
                     b::KeyCode::Escape,
+                    b::KeyCode::Tab,
+                    b::KeyCode::KeyP,
                     b::GamepadButton::Start,
                     b::GamepadButton::Select
                 ],
@@ -517,10 +519,10 @@ fn setup_ui(
                 Controls:
                 WASD or arrows
                 Space to shoot
-                ESC to pause
+                ESC or P to pause
 
-                or use gamepad:
-                any stick
+                Or use gamepad:
+                any stick or D-pad
                 any trigger or button
             ",
         }),
