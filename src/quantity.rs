@@ -1,11 +1,12 @@
 use core::fmt::Write as _;
 use std::f64::consts::PI;
 
+use bevy::camera::Camera3d;
 use bevy::ecs::change_detection::DetectChangesMut;
 use bevy::math::vec2;
 use bevy::prelude as b;
 
-use crate::rendering::PlayfieldCamera;
+use crate::rendering::{OuterCamera, PlayfieldCamera};
 use crate::{GameState, WinOrGameOver};
 
 // -------------------------------------------------------------------------------------------------
@@ -196,13 +197,19 @@ pub(crate) fn update_quantity_display_system_1(
     coherence: b::Single<&Quantity, b::With<Coherence>>,
     // fervor: b::Single<&Quantity, b::With<Fervor>>,
     mut fervor_label_sprite: b::Single<&mut b::Sprite, b::With<crate::BarLabelSprite<Fervor>>>,
-    mut pixel_camera: b::Single<&mut b::Camera, b::With<PlayfieldCamera>>,
+    cameras_to_color: b::Query<
+        &mut b::Camera,
+        b::Or<(b::With<PlayfieldCamera>, b::With<OuterCamera>)>,
+    >,
 ) -> b::Result {
-    pixel_camera.clear_color = bevy::camera::ClearColorConfig::Custom(b::Color::oklch(
+    let clear_color = bevy::camera::ClearColorConfig::Custom(b::Color::oklch(
         fever.effective_value() * 0.05,
         fever.effective_value(),
         0.0,
     ));
+    for mut camera in cameras_to_color {
+        camera.clear_color = clear_color;
+    }
 
     if let Some(assets) = assets {
         let image = if fervor_is_active(&fever, &coherence) {

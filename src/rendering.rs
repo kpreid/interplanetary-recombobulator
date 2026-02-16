@@ -168,16 +168,11 @@ pub(crate) fn fit_canvas_to_window_system(
     };
     for window_resized in resize_messages.read() {
         let window = windows.get(window_resized.window)?;
-        let margin = if let bevy::window::WindowMode::Windowed = window.mode {
-            SCALING_MARGIN
-        } else {
-            0
-        };
 
         // compute scale factor in physical pixels
         let size = window.physical_size();
-        let h_scale = (size.x - margin) / SCREEN_SIZE.x;
-        let v_scale = (size.y - margin) / SCREEN_SIZE.y;
+        let h_scale = size.x / SCREEN_SIZE.x;
+        let v_scale = size.y / SCREEN_SIZE.y;
 
         projection.scale = window.scale_factor() / (h_scale.min(v_scale).max(1) as f32);
     }
