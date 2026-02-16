@@ -1,4 +1,4 @@
-# Interplanetary Recombulation — a game for Bevy Jam #7
+# Interplanetary Recombulator — a game for Bevy Jam #7
 
 [Play the game at itch.io](https://kpreid.itch.io/interplanetary-recombobulator).
 
