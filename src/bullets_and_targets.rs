@@ -109,7 +109,7 @@ pub(crate) fn fire_gun_system(
 
         let (base_shooting_angle, unmodified_bullet_speed) = match team {
             Team::Player => (0.0, 400.0),
-            Team::Enemy => (PI, 200.0),
+            Team::Enemy => (PI, 400.0),
         };
 
         // 1 + 2 * spread_count is the number of bullets
