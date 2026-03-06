@@ -70,6 +70,34 @@ impl Fervor {
 }
 
 // -------------------------------------------------------------------------------------------------
+// Convenient aliases for quantity queries so we don’t have to write so many `Without`s.
+
+pub(crate) type ReadQuantity<'w, 's, T> = b::Single<'w, 's, &'static Quantity, b::With<T>>;
+
+// We could eliminate this boilerplate too by giving each quantity an associated type which provides
+// its needed `Without`s, but that doesn’t seem worthwhile for now.
+// Also, Bevy is working on mutually exclusive components which will hopefully make this whole thing
+// unnecessary.
+pub(crate) type QCoherenceMut<'w, 's> = b::Single<
+    'w,
+    's,
+    &'static mut Quantity,
+    (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
+>;
+pub(crate) type QFeverMut<'w, 's> = b::Single<
+    'w,
+    's,
+    &'static mut Quantity,
+    (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
+>;
+pub(crate) type QFervorMut<'w, 's> = b::Single<
+    'w,
+    's,
+    &'static mut Quantity,
+    (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
+>;
+
+// -------------------------------------------------------------------------------------------------
 
 impl Quantity {
     pub fn new(value: f32) -> Self {
@@ -140,18 +168,9 @@ impl Quantity {
 
 pub(crate) fn quantity_behaviors_system(
     time: b::Res<b::Time>,
-    mut coherence: b::Single<
-        &mut Quantity,
-        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
-    >,
-    mut fever: b::Single<
-        &mut Quantity,
-        (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
-    >,
-    mut fervor: b::Single<
-        &mut Quantity,
-        (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
-    >,
+    mut coherence: QCoherenceMut,
+    mut fever: QFeverMut,
+    mut fervor: QFervorMut,
     mut next_state: b::ResMut<b::NextState<GameState>>,
     mut next_wog_state: b::ResMut<b::NextState<WinOrGameOver>>,
 ) -> b::Result {
@@ -192,9 +211,9 @@ pub(crate) fn quantity_behaviors_system(
 /// Updates display in quantity-specific ways
 pub(crate) fn update_quantity_display_system_1(
     assets: Option<b::Res<crate::MyAssets>>,
-    fever: b::Single<&Quantity, b::With<Fever>>,
-    coherence: b::Single<&Quantity, b::With<Coherence>>,
-    // fervor: b::Single<&Quantity, b::With<Fervor>>,
+    fever: ReadQuantity<Fever>,
+    coherence: ReadQuantity<Coherence>,
+    // fervor: QFervor,
     mut fervor_label_sprite: b::Single<&mut b::Sprite, b::With<crate::BarLabelSprite<Fervor>>>,
     cameras_to_color: b::Query<
         &mut b::Camera,

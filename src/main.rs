@@ -36,7 +36,7 @@ mod quantity;
 use quantity::{Coherence, Fervor, Fever, Quantity};
 
 use crate::bullets_and_targets::Pattern;
-use crate::quantity::UpdateFromQuantity;
+use crate::quantity::{QCoherenceMut, QFervorMut, QFeverMut, UpdateFromQuantity};
 
 // -------------------------------------------------------------------------------------------------
 
@@ -417,9 +417,9 @@ fn setup_status_text(mut commands: b::Commands) {
 fn setup_ui(
     mut commands: b::Commands,
     assets: b::Res<MyAssets>,
-    coherence: b::Single<b::Entity, (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>)>,
-    fever: b::Single<b::Entity, (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>)>,
-    fervor: b::Single<b::Entity, (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>)>,
+    coherence: b::Single<b::Entity, b::With<Coherence>>,
+    fever: b::Single<b::Entity, b::With<Fever>>,
+    fervor: b::Single<b::Entity, b::With<Fervor>>,
     status_text: b::Single<b::Entity, b::With<StatusText>>,
 ) {
     commands.entity(*status_text).insert(b::TextFont {
@@ -751,18 +751,9 @@ fn setup_permanent_gameplay(mut commands: b::Commands) {
 }
 
 fn reset_quantities_for_new_game(
-    mut coherence: b::Single<
-        &mut Quantity,
-        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
-    >,
-    mut fever: b::Single<
-        &mut Quantity,
-        (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
-    >,
-    mut fervor: b::Single<
-        &mut Quantity,
-        (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
-    >,
+    mut coherence: QCoherenceMut,
+    mut fever: QFeverMut,
+    mut fervor: QFervorMut,
     bars_to_hide: b::Query<
         &mut b::Visibility,
         b::Or<(b::With<BarParent<Coherence>>, b::With<BarParent<Fervor>>)>,
@@ -781,10 +772,7 @@ fn reset_quantities_for_new_game(
 fn start_new_game(
     mut commands: b::Commands,
     assets: b::Res<MyAssets>,
-    fever_q_entity: b::Single<
-        b::Entity,
-        (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
-    >,
+    fever_q_entity: b::Single<b::Entity, b::With<Fever>>,
 ) {
     commands.spawn((
         Player,

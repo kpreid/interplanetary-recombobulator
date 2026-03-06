@@ -3,7 +3,7 @@ use bevy::math::{Vec2, vec2};
 use bevy::prelude as b;
 
 use crate::bullets_and_targets::Hurt;
-use crate::quantity::{Coherence, Fervor, Fever, Quantity};
+use crate::quantity::{QCoherenceMut, QFeverMut};
 use crate::rendering::{PLAYFIELD_LAYERS, Zees};
 use crate::{Lifetime, Player};
 
@@ -95,14 +95,8 @@ pub(crate) fn pickup_system(
     mut commands: b::Commands,
     player_query: b::Single<(b::Entity, &p::CollidingEntities), b::With<Player>>,
     pickups: b::Query<(&Pickup, &b::Transform)>,
-    mut coherence: b::Single<
-        &mut Quantity,
-        (b::With<Coherence>, b::Without<Fever>, b::Without<Fervor>),
-    >,
-    mut fever: b::Single<
-        &mut Quantity,
-        (b::With<Fever>, b::Without<Coherence>, b::Without<Fervor>),
-    >,
+    mut coherence: QCoherenceMut,
+    mut fever: QFeverMut,
     assets: b::Res<crate::MyAssets>,
 ) -> b::Result {
     let (player_entity, player_collisions) = player_query.into_inner();

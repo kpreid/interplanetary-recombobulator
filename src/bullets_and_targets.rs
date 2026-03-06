@@ -9,7 +9,7 @@ use rand::RngExt;
 use rand_distr::Distribution as _;
 
 use crate::pickup::Pickup;
-use crate::quantity::fervor_is_active;
+use crate::quantity::{QCoherenceMut, QFervorMut, QFeverMut, ReadQuantity, fervor_is_active};
 use crate::{
     Coherence, Fervor, Fever, Lifetime, PLAYFIELD_LAYERS, PLAYFIELD_RECT, Player, Quantity, Shoot,
     Team, Zees,
@@ -93,8 +93,8 @@ pub(crate) fn player_input_fire_gun(
 pub(crate) fn fire_gun_system(
     mut commands: b::Commands,
     gun_query: b::Query<(&b::Transform, &mut Gun, &Team, b::Has<Player>)>,
-    mut coherence_query: b::Single<&mut Quantity, (b::With<Coherence>, b::Without<Fever>)>,
-    mut fever_query: b::Single<&mut Quantity, b::With<Fever>>,
+    mut coherence_query: QCoherenceMut,
+    mut fever_query: QFeverMut,
     assets: b::Res<crate::MyAssets>,
     images: b::Res<b::Assets<b::Image>>,
 ) -> b::Result {
@@ -309,12 +309,9 @@ pub(crate) fn death_system(
         ),
         (b::Changed<Attackable>, b::Without<b::ChildOf>),
     >,
-    fever_query: b::Single<&Quantity, b::With<Fever>>,
-    coherence_query: b::Single<&Quantity, b::With<Coherence>>,
-    mut fervor_query: b::Single<
-        &mut Quantity,
-        (b::With<Fervor>, b::Without<Coherence>, b::Without<Fever>),
-    >,
+    fever_query: ReadQuantity<Fever>,
+    coherence_query: ReadQuantity<Coherence>,
+    mut fervor_query: QFervorMut,
     mut children_to_drop_query: b::Query<
         (&b::GlobalTransform, &mut b::Transform, &Pickup),
         (
@@ -450,8 +447,8 @@ pub(crate) fn player_health_is_fever_system(
     // Note that this query matches `Player` and not everything on `Team::Player`.
     // This doesn't matter now but we could imagine having drones or something.
     player_query: b::Query<&mut Attackable, b::With<Player>>,
-    mut fever_query: b::Single<&mut Quantity, (b::With<Fever>, b::Without<Fervor>)>,
-    mut fervor_query: b::Single<&mut Quantity, (b::With<Fervor>, b::Without<Fever>)>,
+    mut fever_query: QFeverMut,
+    mut fervor_query: QFervorMut,
 ) {
     for mut attackable in player_query {
         let damage = u8::MAX - attackable.health;
